@@ -25,15 +25,18 @@ def _print_analysis_result(result, label, netlist_name):
     print(f"Detected faults: {result['detected_faults']}")
     print(f"Undetected faults: {result['undetected_faults']}")
     print(f"Fault coverage (%): {result['fault_coverage_pct']:.2f}")
+    print(f"Total backtracks: {result.get('total_backtracks', 0)}")
+    print(f"Average backtracks per fault: {result.get('avg_backtracks_per_fault', 0):.2f}")
     print(f"Total time (ms): {result['total_time_ms']:.3f}")
     print(f"Average per fault (us): {result['avg_time_per_fault_us']:.3f}")
     print("Per-fault results:")
 
     for entry in result["results"]:
+        backtracks = entry.get('backtracks', 'N/A')
         print(
             f"- Fault {entry['fault']} | vector={entry['test_vector']} "
             f"| detected={entry.get('detected', False)} "
-            f"| po={entry['po_values']} | time_us={entry['elapsed_us']:.3f}"
+            f"| po={entry['po_values']} | backtracks={backtracks} | time_us={entry['elapsed_us']:.3f}"
         )
 
 
@@ -47,6 +50,7 @@ def _run_algorithm_on_all_netlists(netlist_folder, label, runner):
     grand_total_ms = 0.0
     grand_faults = 0
     grand_detected = 0
+    grand_backtracks = 0
     run_start = perf_counter()
 
     for netlist_path in netlist_files:
@@ -55,12 +59,15 @@ def _run_algorithm_on_all_netlists(netlist_folder, label, runner):
         grand_total_ms += result["total_time_ms"]
         grand_faults += result["fault_count"]
         grand_detected += result["detected_faults"]
+        grand_backtracks += result.get("total_backtracks", 0)
 
     wall_ms = (perf_counter() - run_start) * 1000.0
     grand_coverage = (grand_detected * 100.0 / grand_faults) if grand_faults else 0.0
+    grand_avg_backtracks = (grand_backtracks / grand_faults) if grand_faults else 0.0
     print(
         f"\n[{label} SUMMARY] Files: {len(netlist_files)} | Faults: {grand_faults} | "
         f"Detected: {grand_detected} | Coverage (%): {grand_coverage:.2f} | "
+        f"Total backtracks: {grand_backtracks} | Avg backtracks/fault: {grand_avg_backtracks:.2f} | "
         f"Fault-sim time (ms): {grand_total_ms:.3f} | Wall time (ms): {wall_ms:.3f}"
     )
 
