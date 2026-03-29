@@ -210,82 +210,99 @@ class DAlgorithmEngine:
         for n in self.circuit.nodes.values():
             n.value = state[n.name]
 
-    def _get_justification_choices(self, gate):
-        target = gate.value
-        choices = []
-        x_fanins = [inp for inp in gate.fanins if inp.value == 'X']
-        
-        if gate.type in ('AND', 'NAND'): c_val = '0'
-        elif gate.type in ('OR', 'NOR'): c_val = '1'
-        else:
-            choices.append({inp: '0' for inp in x_fanins})
-            choices.append({inp: '1' for inp in x_fanins})
-            return choices
+    def _get_all_justification_choices(self, gate):
+        x_inputs = [inp for inp in gate.fanins if inp.value == 'X']
 
-        requires_c_val = (target == '0' and gate.type in ('AND', 'OR')) or \
-                         (target == '1' and gate.type in ('NAND', 'NOR'))
-                         
-        if requires_c_val:
-            for inp in x_fanins:
-                choices.append({inp: c_val})
-        else:
-            nc_val = '1' if c_val == '0' else '0'
-            single_choice = {inp: nc_val for inp in x_fanins}
-            choices.append(single_choice)
-            
+        if not x_inputs:
+            return []
+
+        if len(x_inputs) > 2:
+            return [
+                {inp: '0' for inp in x_inputs},
+                {inp: '1' for inp in x_inputs}
+            ]
+
+        from itertools import product
+
+        choices = []
+        for comb in product(['0', '1'], repeat=len(x_inputs)):
+            assignment = {}
+            for i, inp in enumerate(x_inputs):
+                assignment[inp] = comb[i]
+            choices.append(assignment)
+
         return choices
+
+    def _propagate_through_gate(self, gate):
+        nc_val = self._non_controlling_value(gate.type)
+
+        if nc_val != 'X':
+            for inp in gate.fanins:
+                if inp.value == 'X':
+                    inp.value = nc_val
+            return [{}]
+
+        x_inputs = [inp for inp in gate.fanins if inp.value == 'X']
+
+        branches = []
+        for v in ('0', '1'):
+            assignment = {}
+            for inp in x_inputs:
+                assignment[inp] = v
+            branches.append(assignment)
+
+        return branches
 
     def _d_alg_recur(self):
         if not self._imply():
             return False
 
-        po_has_fault = any(po.value in ('D', 'D_bar') for po in self.circuit.POs)
+        if any(po.value in ('D', 'D_bar') for po in self.circuit.POs):
 
-        if po_has_fault:
             j_front = self._get_j_frontier()
+
             if not j_front:
                 return True
 
             gate = j_front[0]
-            choices = self._get_justification_choices(gate)
-            
+            choices = self._get_all_justification_choices(gate)
+
             for choice in choices:
                 state = self._save_state()
                 self.backtrack_count += 1
+
                 for node, val in choice.items():
                     node.value = val
-                if self._d_alg_recur():
-                    return True
-                self._restore_state(state)
-            return False
-        else:
-            d_front = self._get_d_frontier()
-            if not d_front:
-                return False 
 
-            gate = d_front[0]
-            nc_val = self._non_controlling_value(gate.type)
-            
-            if nc_val != 'X':
-                state = self._save_state()
-                self.backtrack_count += 1
-                for inp in gate.fanins:
-                    if inp.value == 'X':
-                        inp.value = nc_val
                 if self._d_alg_recur():
                     return True
+
                 self._restore_state(state)
-            else:
-                for v in ('0', '1'):
-                    state = self._save_state()
-                    self.backtrack_count += 1
-                    for inp in gate.fanins:
-                        if inp.value == 'X':
-                            inp.value = v
-                    if self._d_alg_recur():
-                        return True
-                    self._restore_state(state)
+
             return False
+
+        d_front = self._get_d_frontier()
+
+        if not d_front:
+            return False
+        gate = d_front[0]
+
+        branches = self._propagate_through_gate(gate)
+
+        for branch in branches:
+            state = self._save_state()
+            self.backtrack_count += 1
+
+            if isinstance(branch, dict):
+                for node, val in branch.items():
+                    node.value = val
+
+            if self._d_alg_recur():
+                return True
+
+            self._restore_state(state)
+
+        return False
 
     def solve_fault(self, fault):
     
