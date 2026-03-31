@@ -564,13 +564,30 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 <p style="margin: 0 0 10px 0; color: #365274; font-size: 13px;">Use DSE to compare ATPG tradeoffs across netlists across three dedicated comparisons.</p>
 
                 <div class="dse-controls">
-                    <strong style="font-size: 12px; color: #365274; letter-spacing: 0.04em; text-transform: uppercase;">Metrics To Compare</strong>
-                    <div class="dse-metrics-grid">
-                        <label style="display:flex; align-items:center; gap:6px; text-transform:none; font-weight:500; color:#10243f;"><input type="checkbox" id="metricCoverage" checked />Coverage (%)</label>
-                        <label style="display:flex; align-items:center; gap:6px; text-transform:none; font-weight:500; color:#10243f;"><input type="checkbox" id="metricTime" checked />Time (ms)</label>
-                        <label style="display:flex; align-items:center; gap:6px; text-transform:none; font-weight:500; color:#10243f;"><input type="checkbox" id="metricBacktracks" checked />Backtracks</label>
-                        <label style="display:flex; align-items:center; gap:6px; text-transform:none; font-weight:500; color:#10243f;"><input type="checkbox" id="metricMemory" checked />Peak Memory (KB)</label>
-                        <label style="display:flex; align-items:center; gap:6px; text-transform:none; font-weight:500; color:#10243f;"><input type="checkbox" id="metricTestVectors" checked />Final Test Vectors</label>
+                    <div style="display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap;">
+                        <div style="flex: 1; min-width: 300px;">
+                            <strong style="font-size: 12px; color: #365274; letter-spacing: 0.04em; text-transform: uppercase;">Metrics To Compare</strong>
+                            <div class="dse-metrics-grid">
+                                <label style="display:flex; align-items:center; gap:6px; text-transform:none; font-weight:500; color:#10243f;"><input type="checkbox" id="metricCoverage" checked />Coverage (%)</label>
+                                <label style="display:flex; align-items:center; gap:6px; text-transform:none; font-weight:500; color:#10243f;"><input type="checkbox" id="metricTime" checked />Time (ms)</label>
+                                <label style="display:flex; align-items:center; gap:6px; text-transform:none; font-weight:500; color:#10243f;"><input type="checkbox" id="metricBacktracks" checked />Backtracks</label>
+                                <label style="display:flex; align-items:center; gap:6px; text-transform:none; font-weight:500; color:#10243f;"><input type="checkbox" id="metricMemory" checked />Peak Memory (KB)</label>
+                                <label style="display:flex; align-items:center; gap:6px; text-transform:none; font-weight:500; color:#10243f;"><input type="checkbox" id="metricTestVectors" checked />Final Test Vectors</label>
+                            </div>
+                        </div>
+                        <div style="flex: 1; min-width: 250px; border-left: 1px solid #d7cfbf; padding-left: 20px;">
+                            <strong style="font-size: 12px; color: #365274; letter-spacing: 0.04em; text-transform: uppercase;">Iterative Tests</strong>
+                            <div style="display: grid; gap: 8px; margin-top: 8px;">
+                                <label style="display:flex; align-items:center; gap:6px; text-transform:none; font-weight:500; color:#10243f;">
+                                    <input type="checkbox" id="enableIterativeTests" />
+                                    Enable Iterative Tests
+                                </label>
+                                <label style="display: grid; gap: 4px; text-transform: none; font-weight: 500; color: #10243f; margin-left: 0;">
+                                    <span style="font-size: 12px;">Iterations (1-1000)</span>
+                                    <input type="number" id="iterationCount" value="100" min="1" max="1000" style="width: 100%; padding: 8px; border: 1px solid #d7cfbf; border-radius: 8px; font-size: 14px;" />
+                                </label>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -666,6 +683,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         const metricBacktracks = document.getElementById('metricBacktracks');
         const metricMemory = document.getElementById('metricMemory');
         const metricTestVectors = document.getElementById('metricTestVectors');
+        const enableIterativeTests = document.getElementById('enableIterativeTests');
+        const iterationCount = document.getElementById('iterationCount');
         const status = document.getElementById('status');
         const results = document.getElementById('results');
         const dseResultsPrimary = document.getElementById('dseResultsPrimary');
@@ -685,6 +704,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             if (metricMemory.checked) selectedMetrics.push('memory');
             if (metricTestVectors.checked) selectedMetrics.push('test_vectors');
             return selectedMetrics;
+        }
+
+        function getIterativeTestSettings() {
+            return {
+                enabled: enableIterativeTests.checked,
+                iterations: Math.min(Math.max(parseInt(iterationCount.value) || 100, 1), 1000)
+            };
         }
 
         async function loadNetlists() {
@@ -787,20 +813,30 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 return;
             }
 
+            const iterativeSettings = getIterativeTestSettings();
+
             runDseBtn.disabled = true;
-            status.textContent = `Running DSE #1 on ${selectedNetlists.length} netlist(s)...`;
+            status.textContent = iterativeSettings.enabled 
+                ? `Running DSE #1 Iterative (${iterativeSettings.iterations}x) on ${selectedNetlists.length} netlist(s)...`
+                : `Running DSE #1 on ${selectedNetlists.length} netlist(s)...`;
             status.classList.add('running');
             status.classList.remove('error');
             dseResultsPrimary.innerHTML = '';
 
             try {
-                const resp = await fetch('/api/dse', {
+                const endpoint = iterativeSettings.enabled ? '/api/dse-iterative' : '/api/dse';
+                const requestBody = {
+                    netlists: selectedNetlists,
+                    metrics: selectedMetrics,
+                };
+                if (iterativeSettings.enabled) {
+                    requestBody.iterations = iterativeSettings.iterations;
+                }
+
+                const resp = await fetch(endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        netlists: selectedNetlists,
-                        metrics: selectedMetrics,
-                    })
+                    body: JSON.stringify(requestBody)
                 });
 
                 if (!resp.ok) {
@@ -815,10 +851,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     return;
                 }
 
-                status.textContent = `DSE #1 complete: ${(data.comparisons || []).length} netlist comparison(s).`;
+                status.textContent = iterativeSettings.enabled
+                    ? `DSE #1 Iterative complete: ${(data.comparisons || []).length} netlist comparison(s) × ${iterativeSettings.iterations} iterations.`
+                    : `DSE #1 complete: ${(data.comparisons || []).length} netlist comparison(s).`;
                 status.classList.remove('running', 'error');
                 status.classList.add('success');
-                renderDseResults(data.comparisons || [], selectedMetrics, dseResultsPrimary, 'DSE #1', 'podem');
+                const renderMode = iterativeSettings.enabled ? 'iterative' : 'pode';
+                renderDseResults(data.comparisons || [], selectedMetrics, dseResultsPrimary, 'DSE #1', renderMode, iterativeSettings.enabled);
             } catch (err) {
                 status.textContent = 'DSE failed: ' + err.message;
                 status.classList.add('error');
@@ -843,20 +882,30 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 return;
             }
 
+            const iterativeSettings = getIterativeTestSettings();
+
             runDsePodemVariantsBtn.disabled = true;
-            status.textContent = `Running DSE #2 on ${selectedNetlists.length} netlist(s)...`;
+            status.textContent = iterativeSettings.enabled 
+                ? `Running DSE #2 Iterative (${iterativeSettings.iterations}x) on ${selectedNetlists.length} netlist(s)...`
+                : `Running DSE #2 on ${selectedNetlists.length} netlist(s)...`;
             status.classList.add('running');
             status.classList.remove('error');
             dseResultsPodemVariants.innerHTML = '';
 
             try {
-                const resp = await fetch('/api/dse-podem-variants', {
+                const endpoint = iterativeSettings.enabled ? '/api/dse-podem-variants-iterative' : '/api/dse-podem-variants';
+                const requestBody = {
+                    netlists: selectedNetlists,
+                    metrics: selectedMetrics,
+                };
+                if (iterativeSettings.enabled) {
+                    requestBody.iterations = iterativeSettings.iterations;
+                }
+
+                const resp = await fetch(endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        netlists: selectedNetlists,
-                        metrics: selectedMetrics,
-                    })
+                    body: JSON.stringify(requestBody)
                 });
 
                 if (!resp.ok) {
@@ -871,10 +920,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     return;
                 }
 
-                status.textContent = `DSE #2 complete: ${(data.comparisons || []).length} netlist comparison(s).`;
+                status.textContent = iterativeSettings.enabled
+                    ? `DSE #2 Iterative complete: ${(data.comparisons || []).length} netlist comparison(s) × ${iterativeSettings.iterations} iterations.`
+                    : `DSE #2 complete: ${(data.comparisons || []).length} netlist comparison(s).`;
                 status.classList.remove('running', 'error');
                 status.classList.add('success');
-                renderDseResults(data.comparisons || [], selectedMetrics, dseResultsPodemVariants, 'DSE #2', 'podem_variants');
+                const renderMode = iterativeSettings.enabled ? 'iterative' : 'podem_variants';
+                renderDseResults(data.comparisons || [], selectedMetrics, dseResultsPodemVariants, 'DSE #2', renderMode, iterativeSettings.enabled);
             } catch (err) {
                 status.textContent = 'DSE #2 failed: ' + err.message;
                 status.classList.add('error');
@@ -887,32 +939,42 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         async function runDseDVariants() {
             const selectedNetlists = getSelectedNetlists();
             if (selectedNetlists.length === 0) {
-                status.textContent = 'Please select at least one netlist for DSE #2.';
+                status.textContent = 'Please select at least one netlist for DSE #3.';
                 status.classList.add('error');
                 return;
             }
 
             const selectedMetrics = getSelectedMetrics();
             if (selectedMetrics.length === 0) {
-                status.textContent = 'Select at least one metric for DSE #2.';
+                status.textContent = 'Select at least one metric for DSE #3.';
                 status.classList.add('error');
                 return;
             }
 
+            const iterativeSettings = getIterativeTestSettings();
+
             runDseDVariantsBtn.disabled = true;
-            status.textContent = `Running DSE #3 on ${selectedNetlists.length} netlist(s)...`;
+            status.textContent = iterativeSettings.enabled 
+                ? `Running DSE #3 Iterative (${iterativeSettings.iterations}x) on ${selectedNetlists.length} netlist(s)...`
+                : `Running DSE #3 on ${selectedNetlists.length} netlist(s)...`;
             status.classList.add('running');
             status.classList.remove('error');
             dseResultsDVariants.innerHTML = '';
 
             try {
-                const resp = await fetch('/api/dse-d-variants', {
+                const endpoint = iterativeSettings.enabled ? '/api/dse-d-variants-iterative' : '/api/dse-d-variants';
+                const requestBody = {
+                    netlists: selectedNetlists,
+                    metrics: selectedMetrics,
+                };
+                if (iterativeSettings.enabled) {
+                    requestBody.iterations = iterativeSettings.iterations;
+                }
+
+                const resp = await fetch(endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        netlists: selectedNetlists,
-                        metrics: selectedMetrics,
-                    })
+                    body: JSON.stringify(requestBody)
                 });
 
                 if (!resp.ok) {
@@ -927,10 +989,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     return;
                 }
 
-                status.textContent = `DSE #3 complete: ${(data.comparisons || []).length} netlist comparison(s).`;
+                status.textContent = iterativeSettings.enabled
+                    ? `DSE #3 Iterative complete: ${(data.comparisons || []).length} netlist comparison(s) × ${iterativeSettings.iterations} iterations.`
+                    : `DSE #3 complete: ${(data.comparisons || []).length} netlist comparison(s).`;
                 status.classList.remove('running', 'error');
                 status.classList.add('success');
-                renderDseResults(data.comparisons || [], selectedMetrics, dseResultsDVariants, 'DSE #3', 'd_variants');
+                const renderMode = iterativeSettings.enabled ? 'iterative' : 'd_variants';
+                renderDseResults(data.comparisons || [], selectedMetrics, dseResultsDVariants, 'DSE #3', renderMode, iterativeSettings.enabled);
             } catch (err) {
                 status.textContent = 'DSE #3 failed: ' + err.message;
                 status.classList.add('error');
@@ -956,20 +1021,30 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 return;
             }
 
+            const iterativeSettings = getIterativeTestSettings();
+
             runDseSimKernelsBtn.disabled = true;
-            status.textContent = `Running DSE #4 on ${selectedNetlists.length} netlist(s)...`;
+            status.textContent = iterativeSettings.enabled 
+                ? `Running DSE #4 Iterative (${iterativeSettings.iterations}x) on ${selectedNetlists.length} netlist(s)...`
+                : `Running DSE #4 on ${selectedNetlists.length} netlist(s)...`;
             status.classList.add('running');
             status.classList.remove('error');
             dseResultsSimKernels.innerHTML = '';
 
             try {
-                const resp = await fetch('/api/dse-sim-kernels', {
+                const endpoint = iterativeSettings.enabled ? '/api/dse-sim-kernels-iterative' : '/api/dse-sim-kernels';
+                const requestBody = {
+                    netlists: selectedNetlists,
+                    metrics: dse4Metrics,
+                };
+                if (iterativeSettings.enabled) {
+                    requestBody.iterations = iterativeSettings.iterations;
+                }
+
+                const resp = await fetch(endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        netlists: selectedNetlists,
-                        metrics: dse4Metrics,
-                    })
+                    body: JSON.stringify(requestBody)
                 });
 
                 if (!resp.ok) {
@@ -984,10 +1059,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     return;
                 }
 
-                status.textContent = `DSE #4 complete: ${(data.comparisons || []).length} netlist comparison(s).`;
+                status.textContent = iterativeSettings.enabled
+                    ? `DSE #4 Iterative complete: ${(data.comparisons || []).length} netlist comparison(s) × ${iterativeSettings.iterations} iterations.`
+                    : `DSE #4 complete: ${(data.comparisons || []).length} netlist comparison(s).`;
                 status.classList.remove('running', 'error');
                 status.classList.add('success');
-                renderDseResults(data.comparisons || [], dse4Metrics, dseResultsSimKernels, 'DSE #4', 'sim_kernels');
+                const renderMode = iterativeSettings.enabled ? 'iterative' : 'sim_kernels';
+                renderDseResults(data.comparisons || [], dse4Metrics, dseResultsSimKernels, 'DSE #4', renderMode, iterativeSettings.enabled);
             } catch (err) {
                 status.textContent = 'DSE #4 failed: ' + err.message;
                 status.classList.add('error');
@@ -1075,7 +1153,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             results.innerHTML = chunks.join('');
         }
 
-        function renderDseResults(comparisons, selectedMetrics, targetElement, dseLabel, overlapMode) {
+        function renderDseResults(comparisons, selectedMetrics, targetElement, dseLabel, overlapMode, isIterative) {
             if (!comparisons || comparisons.length === 0) {
                 targetElement.innerHTML = '<div class="empty">No DSE comparison data.</div>';
                 return;
@@ -1091,70 +1169,129 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
             const cards = comparisons.map((cmp, idx) => {
                 const algos = cmp.algorithms || [];
-                const headers = algos.map(a => `<th>${a.label}</th>`).join('');
-                const rows = selectedMetrics.map(metric => {
-                    const vals = algos.map(a => {
-                        const v = a.metrics[metric];
-                        if (v === null || v === undefined) return 'N/A';
-                        if (typeof v !== 'number') return String(v);
-                        if (metric === 'coverage') return v.toFixed(2);
-                        if (metric === 'test_vectors' || metric === 'backtracks') return String(Math.round(v));
-                        return v.toFixed(3);
-                    }).map(v => `<td>${v}</td>`).join('');
-                    return `<tr><td>${metricLabels[metric] || metric}</td>${vals}</tr>`;
-                }).join('');
 
-                const overlap = cmp.fault_overlap || {};
-                let overlapText = `Both detected: ${overlap.both_detected || 0}`;
-                if (overlapMode === 'd_variants') {
-                    overlapText = `${overlapText}, D-only: ${overlap.d_only || 0}, D_EXHAUSTIVE-only: ${overlap.d_exhaustive_only || 0}`;
-                } else if (overlapMode === 'podem_variants') {
-                    overlapText = `${overlapText}, PODEM-only: ${overlap.podem_only || 0}, PODEM_NO_HEUR-only: ${overlap.podem_no_heur_only || 0}`;
-                } else if (overlapMode === 'sim_kernels') {
-                    const matches = overlap.po_matches || 0;
-                    const total = overlap.po_total || 0;
-                    const mismatches = overlap.po_mismatches || 0;
-                    overlapText = `PO matches: ${matches}/${total}, mismatches: ${mismatches}`;
-                } else {
-                    overlapText = `${overlapText}, D-only: ${overlap.d_only || 0}, PODEM-only: ${overlap.podem_only || 0}`;
-                }
+                // Render results differently for iterative vs single runs
+                if (isIterative) {
+                    // For iterative results, display statistics table
+                    const headers = algos.map(a => `<th>${a.label}</th>`).join('');
+                    const rows = selectedMetrics.map(metric => {
+                        const statCells = algos.map(a => {
+                            const stats = a.metrics_stats && a.metrics_stats[metric];
+                            if (!stats) return '<td>N/A</td>';
+                            const avg = stats.avg || 0;
+                            const decimals = (metric === 'coverage') ? 2 : (metric === 'test_vectors' || metric === 'backtracks') ? 0 : 1;
+                            return `<td style="font-size: 13px; font-weight: 600;">${avg.toFixed(decimals)}</td>`;
+                        }).join('');
+                        return `<tr><td>${metricLabels[metric] || metric}</td>${statCells}</tr>`;
+                    }).join('');
 
-                const vectorBlocks = algos.map(a => {
+                    const overlap = cmp.fault_overlap || {};
+                    let overlapText = `Both detected (avg): ${overlap.both_detected_avg || 0} (min: ${overlap.both_detected_min || 0}, max: ${overlap.both_detected_max || 0})`;
+                    if (overlapMode === 'd_variants') {
+                        overlapText += `, D-only (avg): ${overlap.d_only_avg || 0}, D_EXHAUSTIVE-only (avg): ${overlap.d_exhaustive_only_avg || 0}`;
+                    } else if (overlapMode === 'podem_variants') {
+                        overlapText += `, PODEM-only (avg): ${overlap.podem_only_avg || 0}, PODEM_NO_HEUR-only (avg): ${overlap.podem_no_heur_only_avg || 0}`;
+                    } else if (overlapMode === 'sim_kernels') {
+                        const matches = overlap.po_matches_avg || 0;
+                        const total = overlap.po_total || 0;
+                        const mismatches = overlap.po_mismatches_avg || 0;
+                        overlapText = `PO matches (avg): ${matches.toFixed(1)}/${total}, mismatches (avg): ${mismatches.toFixed(1)}`;
+                    } else {
+                        overlapText += `, D-only (avg): ${overlap.d_only_avg || 0}, PODEM-only (avg): ${overlap.podem_only_avg || 0}`;
+                    }
+
+                    const chartCanvases = selectedMetrics.map(metric => {
+                        const id = `${targetElement.id}_chart_${idx}_${metric}`;
+                        return `<div class="dse-chart"><canvas id="${id}" height="120"></canvas></div>`;
+                    }).join('');
+
                     return `
-                        ${renderVectorSummary(a.final_vector_summary, `${a.label} Final Vectors`)}
-                        ${renderDetectedFaultSummary(a.detected_faults || [], `${a.label} Detected Per-Fault List`)}
+                        <article class="result-card">
+                            <div class="result-head">
+                                <strong>${cmp.netlist}</strong>
+                                <span class="badge badge-run">${dseLabel} (Iterative)</span>
+                            </div>
+                            <div style="padding: 12px; color: #365274; font-size: 13px;">${overlapText}</div>
+                            <div style="padding: 0 12px 12px 12px; overflow-x:auto;">
+                                <table class="dse-table">
+                                    <thead><tr><th>Metric</th>${headers}</tr></thead>
+                                    <tbody>${rows}</tbody>
+                                </table>
+                            </div>
+                            <div class="dse-mini-charts" style="padding: 0 12px 12px 12px;">${chartCanvases}</div>
+                        </article>
                     `;
-                }).join('');
+                } else {
+                    // Original single-run rendering
+                    const headers = algos.map(a => `<th>${a.label}</th>`).join('');
+                    const rows = selectedMetrics.map(metric => {
+                        const vals = algos.map(a => {
+                            const v = a.metrics[metric];
+                            if (v === null || v === undefined) return 'N/A';
+                            if (typeof v !== 'number') return String(v);
+                            if (metric === 'coverage') return v.toFixed(2);
+                            if (metric === 'test_vectors' || metric === 'backtracks') return String(Math.round(v));
+                            return v.toFixed(3);
+                        }).map(v => `<td>${v}</td>`).join('');
+                        return `<tr><td>${metricLabels[metric] || metric}</td>${vals}</tr>`;
+                    }).join('');
 
-                const chartCanvases = selectedMetrics.map(metric => {
-                    const id = `${targetElement.id}_chart_${idx}_${metric}`;
-                    return `<div class="dse-chart"><canvas id="${id}" height="120"></canvas></div>`;
-                }).join('');
+                    const overlap = cmp.fault_overlap || {};
+                    let overlapText = `Both detected: ${overlap.both_detected || 0}`;
+                    if (overlapMode === 'd_variants') {
+                        overlapText = `${overlapText}, D-only: ${overlap.d_only || 0}, D_EXHAUSTIVE-only: ${overlap.d_exhaustive_only || 0}`;
+                    } else if (overlapMode === 'podem_variants') {
+                        overlapText = `${overlapText}, PODEM-only: ${overlap.podem_only || 0}, PODEM_NO_HEUR-only: ${overlap.podem_no_heur_only || 0}`;
+                    } else if (overlapMode === 'sim_kernels') {
+                        const matches = overlap.po_matches || 0;
+                        const total = overlap.po_total || 0;
+                        const mismatches = overlap.po_mismatches || 0;
+                        overlapText = `PO matches: ${matches}/${total}, mismatches: ${mismatches}`;
+                    } else {
+                        overlapText = `${overlapText}, D-only: ${overlap.d_only || 0}, PODEM-only: ${overlap.podem_only || 0}`;
+                    }
 
-                return `
-                    <article class="result-card">
-                        <div class="result-head">
-                            <strong>${cmp.netlist}</strong>
-                            <span class="badge badge-run">${dseLabel}</span>
-                        </div>
-                        <div style="padding: 12px; color: #365274; font-size: 13px;">${overlapText}</div>
-                        <div style="padding: 0 12px 12px 12px; overflow-x:auto;">
-                            <table class="dse-table">
-                                <thead><tr><th>Metric</th>${headers}</tr></thead>
-                                <tbody>${rows}</tbody>
-                            </table>
-                        </div>
-                        <div class="dse-mini-charts" style="padding: 0 12px 12px 12px;">${chartCanvases}</div>
-                        <div style="display:grid; gap:10px; padding-bottom: 8px;">${vectorBlocks}</div>
-                    </article>
-                `;
+                    const vectorBlocks = algos.map(a => {
+                        return `
+                            ${renderVectorSummary(a.final_vector_summary, `${a.label} Final Vectors`)}
+                            ${renderDetectedFaultSummary(a.detected_faults || [], `${a.label} Detected Per-Fault List`)}
+                        `;
+                    }).join('');
+
+                    const chartCanvases = selectedMetrics.map(metric => {
+                        const id = `${targetElement.id}_chart_${idx}_${metric}`;
+                        return `<div class="dse-chart"><canvas id="${id}" height="120"></canvas></div>`;
+                    }).join('');
+
+                    return `
+                        <article class="result-card">
+                            <div class="result-head">
+                                <strong>${cmp.netlist}</strong>
+                                <span class="badge badge-run">${dseLabel}</span>
+                            </div>
+                            <div style="padding: 12px; color: #365274; font-size: 13px;">${overlapText}</div>
+                            <div style="padding: 0 12px 12px 12px; overflow-x:auto;">
+                                <table class="dse-table">
+                                    <thead><tr><th>Metric</th>${headers}</tr></thead>
+                                    <tbody>${rows}</tbody>
+                                </table>
+                            </div>
+                            <div class="dse-mini-charts" style="padding: 0 12px 12px 12px;">${chartCanvases}</div>
+                            <div style="display:grid; gap:10px; padding-bottom: 8px;">${vectorBlocks}</div>
+                        </article>
+                    `;
+                }
             });
 
             targetElement.innerHTML = cards.join('');
 
             comparisons.forEach((cmp, idx) => {
                 selectedMetrics.forEach(metric => {
-                    drawDseChart(`${targetElement.id}_chart_${idx}_${metric}`, cmp, metric);
+                    if (isIterative) {
+                        drawDseIterativeChart(`${targetElement.id}_chart_${idx}_${metric}`, cmp, metric);
+                    } else {
+                        drawDseChart(`${targetElement.id}_chart_${idx}_${metric}`, cmp, metric);
+                    }
                 });
             });
         }
@@ -1198,6 +1335,53 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     ? String(Math.round(v))
                     : String(v.toFixed(metric === 'coverage' ? 2 : 1));
                 ctx.fillText(valueText, x, y - 5);
+                ctx.fillText(algos[i].label, x, height - 8);
+            });
+        }
+
+        function drawDseIterativeChart(canvasId, comparison, metric) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width = canvas.clientWidth;
+            const height = canvas.height;
+            ctx.clearRect(0, 0, width, height);
+
+            const algos = comparison.algorithms || [];
+            if (!algos.length) return;
+
+            // For iterative, draw avg/min/max for each algorithm
+            const avgValues = algos.map(a => {
+                const stats = a.metrics_stats && a.metrics_stats[metric];
+                return stats ? stats.avg : 0;
+            });
+            const maxVal = Math.max(...avgValues, 1);
+            const barW = Math.max(26, Math.floor((width - 40) / Math.max(algos.length, 1) - 10));
+            const gap = 10;
+            const colors = ['#0f766e', '#b91c1c', '#1d4ed8', '#7c3aed'];
+            const metricTitle = {
+                coverage: 'Coverage (%)',
+                time: 'Time (ms)',
+                backtracks: 'Backtracks',
+                memory: 'Peak Memory (KB)',
+                test_vectors: 'Final Test Vectors',
+            };
+
+            ctx.font = '12px Space Grotesk';
+            ctx.fillStyle = '#365274';
+            ctx.fillText(`${metricTitle[metric] || metric} (Iterative Avg)`, 10, 16);
+
+            avgValues.forEach((v, i) => {
+                // Draw average bar only
+                const h = Math.round((v / maxVal) * (height - 58));
+                const x = 20 + i * (barW + gap);
+                const y = height - 28 - h;
+                ctx.fillStyle = colors[i % colors.length];
+                ctx.fillRect(x, y, barW, h);
+
+                ctx.fillStyle = '#10243f';
+                const decimals = metric === 'coverage' ? 2 : (metric === 'test_vectors' || metric === 'backtracks') ? 0 : 1;
+                ctx.fillText(v.toFixed(decimals), x, y - 5);
                 ctx.fillText(algos[i].label, x, height - 8);
             });
         }
@@ -1690,7 +1874,348 @@ def run_dse_sim_kernels():
     except Exception as e:
         return jsonify({'error': f'Internal error: {str(e)}'}), 500
 
-def format_result(result_data, algo, filename):
+
+def _calculate_stats(values):
+    """Calculate min, max, avg, std dev from a list of numbers."""
+    if not values:
+        return {'min': 0, 'max': 0, 'avg': 0, 'std': 0}
+    
+    import statistics
+    min_v = min(values)
+    max_v = max(values)
+    avg_v = statistics.mean(values)
+    std_v = statistics.stdev(values) if len(values) > 1 else 0
+    
+    return {
+        'min': min_v,
+        'max': max_v,
+        'avg': avg_v,
+        'std': std_v,
+    }
+
+
+def _aggregate_algo_metrics_iterative(label, results_list):
+    """Aggregate metrics from multiple runs of an algorithm."""
+    if not results_list:
+        return {
+            'key': label,
+            'label': label,
+            'metrics_stats': {
+                'coverage': {'min': 0, 'max': 0, 'avg': 0, 'std': 0},
+                'time': {'min': 0, 'max': 0, 'avg': 0, 'std': 0},
+                'backtracks': {'min': 0, 'max': 0, 'avg': 0, 'std': 0},
+                'memory': {'min': 0, 'max': 0, 'avg': 0, 'std': 0},
+                'test_vectors': {'min': 0, 'max': 0, 'avg': 0, 'std': 0},
+            },
+        }
+    
+    metrics_data = {
+        'coverage': [],
+        'time': [],
+        'backtracks': [],
+        'memory': [],
+        'test_vectors': [],
+    }
+    
+    for result in results_list:
+        final_vectors = _build_final_vector_summary(result)
+        metrics_data['coverage'].append(float(result.get('fault_coverage_pct', 0.0)))
+        metrics_data['time'].append(float(result.get('total_time_ms', result.get('_wall_time_ms', 0.0))))
+        metrics_data['backtracks'].append(float(result.get('total_backtracks', 0)))
+        metrics_data['memory'].append(float(result.get('_memory_peak_bytes', 0)) / 1024.0)
+        metrics_data['test_vectors'].append(float(final_vectors.get('vector_count', 0)))
+    
+    return {
+        'key': label,
+        'label': label,
+        'metrics_stats': {
+            'coverage': _calculate_stats(metrics_data['coverage']),
+            'time': _calculate_stats(metrics_data['time']),
+            'backtracks': _calculate_stats(metrics_data['backtracks']),
+            'memory': _calculate_stats(metrics_data['memory']),
+            'test_vectors': _calculate_stats(metrics_data['test_vectors']),
+        },
+    }
+
+
+@app.route('/api/dse-iterative', methods=['POST'])
+def run_dse_iterative():
+    """Run DSE #1 iteratively: D vs PODEM with multiple iterations."""
+    try:
+        payload = request.json or {}
+        netlist_names = payload.get('netlists', [])
+        iterations = min(max(payload.get('iterations', 100), 1), 1000)
+
+        if not netlist_names or not isinstance(netlist_names, list):
+            return jsonify({'error': 'netlists array required'}), 400
+
+        comparisons = []
+
+        for netlist_name in netlist_names:
+            name = str(netlist_name).strip()
+            netlist_path = NETLISTS_FOLDER / name
+            if not netlist_path.exists():
+                continue
+
+            d_results = []
+            podem_results = []
+
+            for _ in range(iterations):
+                circuit = parse_netlist(str(netlist_path))
+                levelize(circuit)
+                d_result = _run_engine_with_memory(DAlgorithmEngine(circuit))
+                d_results.append(d_result)
+
+                circuit = parse_netlist(str(netlist_path))
+                levelize(circuit)
+                podem_result = _run_engine_with_memory(PODEMEngine(circuit, use_heuristics=True))
+                podem_results.append(podem_result)
+
+            # Aggregate overlaps
+            all_d_sets = [_detected_fault_set(r) for r in d_results]
+            all_p_sets = [_detected_fault_set(r) for r in podem_results]
+            
+            both_detected_counts = [len(d_set & p_set) for d_set, p_set in zip(all_d_sets, all_p_sets)]
+            d_only_counts = [len(d_set - p_set) for d_set, p_set in zip(all_d_sets, all_p_sets)]
+            p_only_counts = [len(p_set - d_set) for d_set, p_set in zip(all_d_sets, all_p_sets)]
+
+            comparisons.append({
+                'netlist': name,
+                'algorithms': [
+                    _aggregate_algo_metrics_iterative('D', d_results),
+                    _aggregate_algo_metrics_iterative('PODEM', podem_results),
+                ],
+                'fault_overlap': {
+                    'both_detected_avg': sum(both_detected_counts) / len(both_detected_counts) if both_detected_counts else 0,
+                    'both_detected_min': min(both_detected_counts) if both_detected_counts else 0,
+                    'both_detected_max': max(both_detected_counts) if both_detected_counts else 0,
+                    'd_only_avg': sum(d_only_counts) / len(d_only_counts) if d_only_counts else 0,
+                    'pode_only_avg': sum(p_only_counts) / len(p_only_counts) if p_only_counts else 0,
+                },
+            })
+
+        return jsonify({
+            'status': 'ok',
+            'comparisons': comparisons,
+        })
+    except Exception as e:
+        return jsonify({'error': f'Internal error: {str(e)}'}), 500
+
+
+@app.route('/api/dse-podem-variants-iterative', methods=['POST'])
+def run_dse_podem_variants_iterative():
+    """Run DSE #2 iteratively: PODEM vs PODEM_NO_HEUR with multiple iterations."""
+    try:
+        payload = request.json or {}
+        netlist_names = payload.get('netlists', [])
+        iterations = min(max(payload.get('iterations', 100), 1), 1000)
+
+        if not netlist_names or not isinstance(netlist_names, list):
+            return jsonify({'error': 'netlists array required'}), 400
+
+        comparisons = []
+
+        for netlist_name in netlist_names:
+            name = str(netlist_name).strip()
+            netlist_path = NETLISTS_FOLDER / name
+            if not netlist_path.exists():
+                continue
+
+            podem_results = []
+            podem_no_heur_results = []
+
+            for _ in range(iterations):
+                circuit = parse_netlist(str(netlist_path))
+                levelize(circuit)
+                podem_result = _run_engine_with_memory(PODEMEngine(circuit, use_heuristics=True))
+                podem_results.append(podem_result)
+
+                circuit = parse_netlist(str(netlist_path))
+                levelize(circuit)
+                podem_no_heur_result = _run_engine_with_memory(PODEMEngine(circuit, use_heuristics=False))
+                podem_no_heur_results.append(podem_no_heur_result)
+
+            # Aggregate overlaps
+            all_p_sets = [_detected_fault_set(r) for r in podem_results]
+            all_p0_sets = [_detected_fault_set(r) for r in podem_no_heur_results]
+            
+            both_detected_counts = [len(p_set & p0_set) for p_set, p0_set in zip(all_p_sets, all_p0_sets)]
+            p_only_counts = [len(p_set - p0_set) for p_set, p0_set in zip(all_p_sets, all_p0_sets)]
+            p0_only_counts = [len(p0_set - p_set) for p_set, p0_set in zip(all_p_sets, all_p0_sets)]
+
+            comparisons.append({
+                'netlist': name,
+                'algorithms': [
+                    _aggregate_algo_metrics_iterative('PODEM', podem_results),
+                    _aggregate_algo_metrics_iterative('PODEM_NO_HEUR', podem_no_heur_results),
+                ],
+                'fault_overlap': {
+                    'both_detected_avg': sum(both_detected_counts) / len(both_detected_counts) if both_detected_counts else 0,
+                    'both_detected_min': min(both_detected_counts) if both_detected_counts else 0,
+                    'both_detected_max': max(both_detected_counts) if both_detected_counts else 0,
+                    'podem_only_avg': sum(p_only_counts) / len(p_only_counts) if p_only_counts else 0,
+                    'podem_no_heur_only_avg': sum(p0_only_counts) / len(p0_only_counts) if p0_only_counts else 0,
+                },
+            })
+
+        return jsonify({
+            'status': 'ok',
+            'comparisons': comparisons,
+        })
+    except Exception as e:
+        return jsonify({'error': f'Internal error: {str(e)}'}), 500
+
+
+@app.route('/api/dse-d-variants-iterative', methods=['POST'])
+def run_dse_d_variants_iterative():
+    """Run DSE #3 iteratively: D vs D_EXHAUSTIVE with multiple iterations."""
+    try:
+        payload = request.json or {}
+        netlist_names = payload.get('netlists', [])
+        iterations = min(max(payload.get('iterations', 100), 1), 1000)
+
+        if not netlist_names or not isinstance(netlist_names, list):
+            return jsonify({'error': 'netlists array required'}), 400
+
+        comparisons = []
+
+        for netlist_name in netlist_names:
+            name = str(netlist_name).strip()
+            netlist_path = NETLISTS_FOLDER / name
+            if not netlist_path.exists():
+                continue
+
+            d_results = []
+            d_exhaustive_results = []
+
+            for _ in range(iterations):
+                circuit = parse_netlist(str(netlist_path))
+                levelize(circuit)
+                d_result = _run_engine_with_memory(DAlgorithmEngine(circuit))
+                d_results.append(d_result)
+
+                circuit = parse_netlist(str(netlist_path))
+                levelize(circuit)
+                d_exhaustive_result = _run_engine_with_memory(DExhaustiveAlgorithmEngine(circuit))
+                d_exhaustive_results.append(d_exhaustive_result)
+
+            # Aggregate overlaps
+            all_d_sets = [_detected_fault_set(r) for r in d_results]
+            all_d2_sets = [_detected_fault_set(r) for r in d_exhaustive_results]
+            
+            both_detected_counts = [len(d_set & d2_set) for d_set, d2_set in zip(all_d_sets, all_d2_sets)]
+            d_only_counts = [len(d_set - d2_set) for d_set, d2_set in zip(all_d_sets, all_d2_sets)]
+            d2_only_counts = [len(d2_set - d_set) for d_set, d2_set in zip(all_d_sets, all_d2_sets)]
+
+            comparisons.append({
+                'netlist': name,
+                'algorithms': [
+                    _aggregate_algo_metrics_iterative('D', d_results),
+                    _aggregate_algo_metrics_iterative('D_EXHAUSTIVE', d_exhaustive_results),
+                ],
+                'fault_overlap': {
+                    'both_detected_avg': sum(both_detected_counts) / len(both_detected_counts) if both_detected_counts else 0,
+                    'both_detected_min': min(both_detected_counts) if both_detected_counts else 0,
+                    'both_detected_max': max(both_detected_counts) if both_detected_counts else 0,
+                    'd_only_avg': sum(d_only_counts) / len(d_only_counts) if d_only_counts else 0,
+                    'd_exhaustive_only_avg': sum(d2_only_counts) / len(d2_only_counts) if d2_only_counts else 0,
+                },
+            })
+
+        return jsonify({
+            'status': 'ok',
+            'comparisons': comparisons,
+        })
+    except Exception as e:
+        return jsonify({'error': f'Internal error: {str(e)}'}), 500
+
+
+@app.route('/api/dse-sim-kernels-iterative', methods=['POST'])
+def run_dse_sim_kernels_iterative():
+    """Run DSE #4 iteratively: SIMULATE vs EVENT_DRIVEN with multiple iterations."""
+    try:
+        payload = request.json or {}
+        netlist_names = payload.get('netlists', [])
+        iterations = min(max(payload.get('iterations', 100), 1), 1000)
+
+        if not netlist_names or not isinstance(netlist_names, list):
+            return jsonify({'error': 'netlists array required'}), 400
+
+        comparisons = []
+
+        for netlist_name in netlist_names:
+            name = str(netlist_name).strip()
+            netlist_path = NETLISTS_FOLDER / name
+            if not netlist_path.exists():
+                continue
+
+            sim_times = []
+            ev_times = []
+            sim_memories = []
+            ev_memories = []
+            po_matches_list = []
+
+            for _ in range(iterations):
+                circuit = parse_netlist(str(netlist_path))
+                levelize(circuit)
+                assign_default_inputs(circuit)
+                sim_result = _run_simulation_kernel_with_memory(circuit, 'simulate')
+                
+                circuit = parse_netlist(str(netlist_path))
+                levelize(circuit)
+                assign_default_inputs(circuit)
+                ev_result = _run_simulation_kernel_with_memory(circuit, 'event_driven')
+
+                sim_times.append(float(sim_result.get('_wall_time_ms', 0.0)))
+                ev_times.append(float(ev_result.get('_wall_time_ms', 0.0)))
+                sim_memories.append(float(sim_result.get('_memory_peak_bytes', 0)) / 1024.0)
+                ev_memories.append(float(ev_result.get('_memory_peak_bytes', 0)) / 1024.0)
+
+                sim_po = sim_result.get('po_values', {})
+                ev_po = ev_result.get('po_values', {})
+                po_names = sorted(set(sim_po.keys()) | set(ev_po.keys()))
+                po_matches = sum(1 for po in po_names if sim_po.get(po) == ev_po.get(po))
+                po_matches_list.append(po_matches)
+
+            comparisons.append({
+                'netlist': name,
+                'algorithms': [
+                    {
+                        'key': 'SIMULATE',
+                        'label': 'SIMULATE',
+                        'metrics_stats': {
+                            'coverage': {'min': 0, 'max': 0, 'avg': 0, 'std': 0},
+                            'time': _calculate_stats(sim_times),
+                            'backtracks': {'min': 0, 'max': 0, 'avg': 0, 'std': 0},
+                            'memory': _calculate_stats(sim_memories),
+                            'test_vectors': {'min': 0, 'max': 0, 'avg': 0, 'std': 0},
+                        },
+                    },
+                    {
+                        'key': 'EVENT_DRIVEN',
+                        'label': 'EVENT_DRIVEN',
+                        'metrics_stats': {
+                            'coverage': {'min': 0, 'max': 0, 'avg': 0, 'std': 0},
+                            'time': _calculate_stats(ev_times),
+                            'backtracks': {'min': 0, 'max': 0, 'avg': 0, 'std': 0},
+                            'memory': _calculate_stats(ev_memories),
+                            'test_vectors': {'min': 0, 'max': 0, 'avg': 0, 'std': 0},
+                        },
+                    },
+                ],
+                'fault_overlap': {
+                    'po_matches_avg': sum(po_matches_list) / len(po_matches_list) if po_matches_list else 0,
+                    'po_total': len(po_names) if 'po_names' in locals() else 0,
+                    'po_mismatches_avg': len(po_names) - (sum(po_matches_list) / len(po_matches_list)) if po_matches_list and 'po_names' in locals() else 0,
+                },
+            })
+
+        return jsonify({
+            'status': 'ok',
+            'comparisons': comparisons,
+        })
+    except Exception as e:
+        return jsonify({'error': f'Internal error: {str(e)}'}), 500
     """Format ATPG result data for frontend display."""
     final_vectors = _build_final_vector_summary(result_data)
 
