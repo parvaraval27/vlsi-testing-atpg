@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATPG Web Console</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+</head>
+<body>
+    <div class="shell">
+        <aside class="panel">
+            <div class="panel-head">
+                <h2>Run Configuration</h2>
+                <p>Select netlists & algorithms, then execute.</p>
+            </div>
+            <div class="panel-body">
+                <label style="text-transform: uppercase; font-size: 12px; font-weight: 700; color: #365274; margin-bottom: 8px; display: block;">
+                    Select Netlists
+                </label>
+                <div id="netlistsContainer" style="display: grid; gap: 6px; max-height: 160px; overflow-y: auto; border: 1px solid #d7cfbf; border-radius: 10px; padding: 10px; background: #fffdf9;">
+                    <p style="margin: 0; color: #999; font-size: 13px;">Loading netlists...</p>
+                </div>
+
+                <label style="text-transform: uppercase; font-size: 12px; font-weight: 700; color: #365274; margin-top: 14px; margin-bottom: 8px; display: block;">
+                    Select Algorithms
+                </label>
+                <div style="display: grid; gap: 6px;">
+                    <label style="display: flex; align-items: center; gap: 8px; font-weight: 400; text-transform: none; margin: 0; color: #10243f; cursor: pointer;">
+                        <input type="checkbox" id="algoBasic" value="BASIC" />
+                        <span>Basic Flow</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px; font-weight: 400; text-transform: none; margin: 0; color: #10243f; cursor: pointer;">
+                        <input type="checkbox" id="algoD" checked value="D" />
+                        <span>D Algorithm</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px; font-weight: 400; text-transform: none; margin: 0; color: #10243f; cursor: pointer;">
+                        <input type="checkbox" id="algoPODEM" checked value="PODEM" />
+                        <span>PODEM</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px; font-weight: 400; text-transform: none; margin: 0; color: #10243f; cursor: pointer;">
+                        <input type="checkbox" id="algoDExhaustive" value="D_EXHAUSTIVE" />
+                        <span>D_EXHAUSTIVE</span>
+                    </label>
+                </div>
+
+                <div class="btn-row" style="margin-top: 14px;">
+                    <button class="btn-primary" id="runBtn" onclick="runATPC()">Run ATPG</button>
+                </div>
+
+                <div id="status" class="status"></div>
+            </div>
+        </aside>
+
+        <main class="main">
+            <section class="hero">
+                <h1>ATPG Web Console</h1>
+                <p>Full-stack web interface for automatic test pattern generation. Select a netlist, choose your algorithm and execute directly from the browser with real-time results.</p>
+            </section>
+
+            <section class="dse-panel">
+                <h2 style="margin: 0 0 6px 0; font-size: 18px;">Design Space Exploration (DSE)</h2>
+                <p style="margin: 0 0 10px 0; color: #365274; font-size: 13px;">Use DSE to compare ATPG tradeoffs across netlists across three dedicated comparisons.</p>
+
+                <div class="dse-controls">
+                    <div style="display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap;">
+                        <div style="flex: 1; min-width: 300px;">
+                            <strong style="font-size: 12px; color: #365274; letter-spacing: 0.04em; text-transform: uppercase;">Metrics To Compare</strong>
+                            <div class="dse-metrics-grid">
+                                <label style="display:flex; align-items:center; gap:6px; text-transform:none; font-weight:500; color:#10243f;"><input type="checkbox" id="metricCoverage" checked />Coverage (%)</label>
+                                <label style="display:flex; align-items:center; gap:6px; text-transform:none; font-weight:500; color:#10243f;"><input type="checkbox" id="metricTime" checked />Time (ms)</label>
+                                <label style="display:flex; align-items:center; gap:6px; text-transform:none; font-weight:500; color:#10243f;"><input type="checkbox" id="metricBacktracks" checked />Backtracks</label>
+                                <label style="display:flex; align-items:center; gap:6px; text-transform:none; font-weight:500; color:#10243f;"><input type="checkbox" id="metricMemory" checked />Peak Memory (KB)</label>
+                                <label style="display:flex; align-items:center; gap:6px; text-transform:none; font-weight:500; color:#10243f;"><input type="checkbox" id="metricTestVectors" checked />Final Test Vectors</label>
+                            </div>
+                        </div>
+                        <div style="flex: 1; min-width: 250px; border-left: 1px solid #d7cfbf; padding-left: 20px;">
+                            <strong style="font-size: 12px; color: #365274; letter-spacing: 0.04em; text-transform: uppercase; display:block; margin-bottom:8px;">Execution Mode</strong>
+                            <label style="display:flex; align-items:center; gap:8px; text-transform:none; font-weight:500; color:#10243f; margin-bottom:10px;">
+                                <input type="checkbox" id="dseIterativeMode" />
+                                Enable iterative averaging
+                            </label>
+                            <label for="dseIterationsInput" style="display:block; margin-bottom:6px; font-size:12px; font-weight:700; color:#365274; text-transform:uppercase; letter-spacing:0.04em;">Iterations (1-10)</label>
+                            <input
+                                id="dseIterationsInput"
+                                type="number"
+                                min="1"
+                                max="10"
+                                step="1"
+                                value="3"
+                                disabled
+                                style="width:110px; padding:6px 8px; border:1px solid #d7cfbf; border-radius:8px; font-size:13px; color:#10243f; background:#f6f7f9;"
+                            />
+                            <p style="margin: 8px 0 0 0; color: #365274; font-size: 12px; line-height: 1.4;">
+                                Enable iterative mode to run each DSE comparison repeatedly and report averaged metrics.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dse-block">
+                    <h3 style="margin: 0 0 6px 0; font-size: 16px;">DSE #1: D vs PODEM</h3>
+                    <p style="margin: 0 0 10px 0; color: #365274; font-size: 13px;">Compares baseline D engine directly against heuristic-enabled PODEM.</p>
+                    <div class="btn-row" style="margin-top: 4px; margin-bottom: 8px;">
+                        <button class="btn-soft" id="runDseBtn" onclick="runDSE()">Run DSE #1</button>
+                    </div>
+                    <p style="margin: 0; color: #365274; font-size: 12px;">Output appears below the first screen in the unified results area.</p>
+                </div>
+
+                <div class="dse-block">
+                    <h3 style="margin: 0 0 6px 0; font-size: 16px;">DSE #2: PODEM vs PODEM_NO_HEUR</h3>
+                    <p style="margin: 0 0 10px 0; color: #365274; font-size: 13px;">Compares heuristic-enabled PODEM against the non-heuristic PODEM baseline.</p>
+                    <div class="btn-row" style="margin-top: 4px; margin-bottom: 8px;">
+                        <button class="btn-soft" id="runDsePodemVariantsBtn" onclick="runDsePodemVariants()">Run DSE #2</button>
+                    </div>
+                    <p style="margin: 0; color: #365274; font-size: 12px;">Output appears below the first screen in the unified results area.</p>
+                </div>
+
+                <div class="dse-block">
+                    <h3 style="margin: 0 0 6px 0; font-size: 16px;">DSE #3: D vs D_EXHAUSTIVE</h3>
+                    <p style="margin: 0 0 10px 0; color: #365274; font-size: 13px;">Compares baseline D engine from d.py against D_EXHAUSTIVE from d2.py.</p>
+                    <div class="btn-row" style="margin-top: 4px; margin-bottom: 8px;">
+                        <button class="btn-soft" id="runDseDVariantsBtn" onclick="runDseDVariants()">Run DSE #3</button>
+                    </div>
+                    <p style="margin: 0; color: #365274; font-size: 12px;">Output appears below the first screen in the unified results area.</p>
+                </div>
+
+                <div class="dse-block">
+                    <h3 style="margin: 0 0 6px 0; font-size: 16px;">DSE #4: SIMULATE vs EVENT_DRIVEN</h3>
+                    <p style="margin: 0 0 10px 0; color: #365274; font-size: 13px;">Compares levelized simulate() and event-driven simulate_event_driven() kernels in Basic flow.</p>
+                    <div class="btn-row" style="margin-top: 4px; margin-bottom: 8px;">
+                        <button class="btn-soft" id="runDseSimKernelsBtn" onclick="runDseSimKernels()">Run DSE #4</button>
+                    </div>
+                    <p style="margin: 0; color: #365274; font-size: 12px;">Output appears below the first screen in the unified results area.</p>
+                </div>
+
+                <div class="dse-block">
+                    <h3 style="margin: 0 0 6px 0; font-size: 16px;">DSE #5: Fill-bit policies</h3>
+                    <p style="margin: 0 0 10px 0; color: #365274; font-size: 13px;">Compares 0-fill, 1-fill, and deterministic random-fill on partially specified test vectors.</p>
+                    <div class="btn-row" style="margin-top: 4px; margin-bottom: 8px;">
+                        <button class="btn-soft" id="runDseFillVariantsBtn" onclick="runDseFillVariants()">Run DSE #5</button>
+                    </div>
+                    <p style="margin: 0; color: #365274; font-size: 12px;">Output appears below the first screen in the unified results area.</p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <section class="workspace-outputs">
+        <div class="outputs-panel">
+            <details class="output-collapse" id="outAtpg">
+                <summary>ATPG Run Output</summary>
+                <section id="results" class="results">
+                    <div class="empty">Select a netlist and click Run ATPG.</div>
+                </section>
+            </details>
+        </div>
+
+        <div class="outputs-panel">
+            <details class="output-collapse" id="outDse1">
+                <summary>DSE #1 Output (D vs PODEM)</summary>
+                <section id="dseResultsPrimary" class="results">
+                    <div class="empty">Run DSE #1 to compare D and PODEM variants.</div>
+                </section>
+            </details>
+        </div>
+
+        <div class="outputs-panel">
+            <details class="output-collapse" id="outDse2">
+                <summary>DSE #2 Output (PODEM vs PODEM_NO_HEUR)</summary>
+                <section id="dseResultsPodemVariants" class="results">
+                    <div class="empty">Run DSE #2 to compare PODEM and PODEM_NO_HEUR.</div>
+                </section>
+            </details>
+        </div>
+
+        <div class="outputs-panel">
+            <details class="output-collapse" id="outDse3">
+                <summary>DSE #3 Output (D vs D_EXHAUSTIVE)</summary>
+                <section id="dseResultsDVariants" class="results">
+                    <div class="empty">Run DSE #3 to compare D and D_EXHAUSTIVE.</div>
+                </section>
+            </details>
+        </div>
+
+        <div class="outputs-panel">
+            <details class="output-collapse" id="outDse4">
+                <summary>DSE #4 Output (SIMULATE vs EVENT_DRIVEN)</summary>
+                <section id="dseResultsSimKernels" class="results">
+                    <div class="empty">Run DSE #4 to compare simulate() and simulate_event_driven().</div>
+                </section>
+            </details>
+        </div>
+
+        <div class="outputs-panel">
+            <details class="output-collapse" id="outDse5">
+                <summary>DSE #5 Output (Fill-bit policies)</summary>
+                <section id="dseResultsFillVariants" class="results">
+                    <div class="empty">Run DSE #5 to compare 0-fill, 1-fill, and random-fill.</div>
+                </section>
+            </details>
+        </div>
+    </section>
+
+        <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
