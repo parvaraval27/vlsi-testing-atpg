@@ -40,10 +40,6 @@
                         <input type="checkbox" id="algoPODEM" checked value="PODEM" />
                         <span>PODEM</span>
                     </label>
-                    <label style="display: flex; align-items: center; gap: 8px; font-weight: 400; text-transform: none; margin: 0; color: #10243f; cursor: pointer;">
-                        <input type="checkbox" id="algoDExhaustive" value="D_EXHAUSTIVE" />
-                        <span>D_EXHAUSTIVE</span>
-                    </label>
                 </div>
 
                 <div class="btn-row" style="margin-top: 14px;">
@@ -122,8 +118,8 @@
                 </div>
 
                 <div class="dse-block">
-                    <h3 style="margin: 0 0 6px 0; font-size: 16px;">DSE #3: D vs D_EXHAUSTIVE</h3>
-                    <p style="margin: 0 0 10px 0; color: #365274; font-size: 13px;">Compares baseline D engine from d.py against D_EXHAUSTIVE from d2.py.</p>
+                    <h3 style="margin: 0 0 6px 0; font-size: 16px;">DSE #3: D vs D_QUICK</h3>
+                    <p style="margin: 0 0 10px 0; color: #365274; font-size: 13px;">Compares baseline D engine from d.py against D_QUICK from d2.py.</p>
                     <div class="btn-row" style="margin-top: 4px; margin-bottom: 8px;">
                         <button class="btn-soft" id="runDseDVariantsBtn" onclick="runDseDVariants()">Run DSE #3</button>
                     </div>
@@ -181,9 +177,9 @@
 
         <div class="outputs-panel">
             <details class="output-collapse" id="outDse3">
-                <summary>DSE #3 Output (D vs D_EXHAUSTIVE)</summary>
+                <summary>DSE #3 Output (D vs D_QUICK)</summary>
                 <section id="dseResultsDVariants" class="results">
-                    <div class="empty">Run DSE #3 to compare D and D_EXHAUSTIVE.</div>
+                    <div class="empty">Run DSE #3 to compare D and D_QUICK.</div>
                 </section>
             </details>
         </div>

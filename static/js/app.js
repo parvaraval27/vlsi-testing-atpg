@@ -2,7 +2,6 @@
         const algoBasic = document.getElementById('algoBasic');
         const algoD = document.getElementById('algoD');
         const algoPODEM = document.getElementById('algoPODEM');
-        const algoDExhaustive = document.getElementById('algoDExhaustive');
         const runBtn = document.getElementById('runBtn');
         const runDseBtn = document.getElementById('runDseBtn');
         const runDsePodemVariantsBtn = document.getElementById('runDsePodemVariantsBtn');
@@ -178,7 +177,6 @@
             if (algoBasic.checked) selectedAlgos.push('BASIC');
             if (algoD.checked) selectedAlgos.push('D');
             if (algoPODEM.checked) selectedAlgos.push('PODEM');
-            if (algoDExhaustive.checked) selectedAlgos.push('D_EXHAUSTIVE');
 
             if (selectedNetlists.length === 0) {
                 status.textContent = 'Please select at least one netlist.';
@@ -709,7 +707,7 @@
                     const overlap = cmp.fault_overlap || {};
                     let overlapText = `Both detected (avg): ${overlap.both_detected_avg || 0} (min: ${overlap.both_detected_min || 0}, max: ${overlap.both_detected_max || 0})`;
                     if (overlapMode === 'd_variants') {
-                        overlapText += `, D-only (avg): ${overlap.d_only_avg || 0}, D_EXHAUSTIVE-only (avg): ${overlap.d_exhaustive_only_avg || 0}`;
+                        overlapText += `, D-only (avg): ${overlap.d_only_avg || 0}, D_QUICK-only (avg): ${overlap.d_quick_only_avg || 0}`;
                     } else if (overlapMode === 'podem_variants') {
                         overlapText += `, PODEM-only (avg): ${overlap.podem_only_avg || 0}, PODEM_NO_HEUR-only (avg): ${overlap.podem_no_heur_only_avg || 0}`;
                     } else if (overlapMode === 'sim_kernels') {
@@ -771,7 +769,7 @@
                     const overlap = cmp.fault_overlap || {};
                     let overlapText = `Both detected: ${overlap.both_detected || 0}`;
                     if (overlapMode === 'd_variants') {
-                        overlapText = `${overlapText}, D-only: ${overlap.d_only || 0}, D_EXHAUSTIVE-only: ${overlap.d_exhaustive_only || 0}`;
+                        overlapText = `${overlapText}, D-only: ${overlap.d_only || 0}, D_QUICK-only: ${overlap.d_quick_only || 0}`;
                     } else if (overlapMode === 'podem_variants') {
                         overlapText = `${overlapText}, PODEM-only: ${overlap.podem_only || 0}, PODEM_NO_HEUR-only: ${overlap.podem_no_heur_only || 0}`;
                     } else if (overlapMode === 'sim_kernels') {

@@ -8,7 +8,7 @@ import sys
 # Import ATPG engines
 sys.path.insert(0, os.path.dirname(__file__))
 from d import DAlgorithmEngine
-from d2 import DAlgorithmEngine as DExhaustiveAlgorithmEngine
+from d2 import DAlgorithmEngine as DQuickAlgorithmEngine
 from podem import PODEMEngine
 from netlist_graph import (
     assign_default_inputs,
@@ -111,10 +111,10 @@ def run_atpg():
                         engine = DAlgorithmEngine(circuit)
                         result_data = engine.run()
                         results.append(format_result(result_data, 'D', netlist_name))
-                    elif algo in ('D_EXHAUSTIVE', 'D2'):
-                        engine = DExhaustiveAlgorithmEngine(circuit)
+                    elif algo in ('D_QUICK', 'D2'):
+                        engine = DQuickAlgorithmEngine(circuit)
                         result_data = engine.run()
-                        results.append(format_result(result_data, 'D_EXHAUSTIVE', netlist_name))
+                        results.append(format_result(result_data, 'D_QUICK', netlist_name))
                     elif algo == 'PODEM':
                         engine = PODEMEngine(circuit)
                         result_data = engine.run()

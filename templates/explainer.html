@@ -74,9 +74,9 @@
                                 <td>Heuristic impact on the same engine family</td>
                             </tr>
                             <tr>
-                                <td>D vs D_EXHAUSTIVE</td>
+                                <td>D vs D_QUICK</td>
                                 <td>/api/dse-d-variants</td>
-                                <td>Baseline D compared to the exhaustive variant</td>
+                                <td>Baseline D compared to the quicker variant</td>
                             </tr>
                             <tr>
                                 <td>SIMULATE vs EVENT_DRIVEN</td>
@@ -120,7 +120,7 @@
                             <span class="brief-pill metric">DAlgorithmEngine</span>
                         </div>
                         <h3>Purpose</h3>
-                        <p>Runs the classic D-algorithm ATPG engine on the levelized circuit. In DSE #1 it is compared directly with PODEM and in DSE #3 it is compared with D_EXHAUSTIVE.</p>
+                        <p>Runs the classic D-algorithm ATPG engine on the levelized circuit. In DSE #1 it is compared directly with PODEM and in DSE #3 it is compared with D_QUICK.</p>
                         <p><strong>Key functions:</strong> DAlgorithmEngine(circuit), run_engine_with_memory(), dse_algo_metrics().</p>
                         <p><strong>Read the output as:</strong> coverage, backtracks, time, memory, final vector count and the detected-versus-undetected fault split.</p>
                     </div>
@@ -156,8 +156,8 @@
                         <p>Isolates the effect of heuristics inside the same search strategy. This is the cleanest comparison for judging search guidance.</p>
                     </div>
                     <div class="flow-step">
-                        <strong>DSE #3: D vs D_EXHAUSTIVE</strong>
-                        <p>Compares the baseline D engine against the more exhaustive variant so you can see whether extra search effort buys additional detection.</p>
+                        <strong>DSE #3: D vs D_QUICK</strong>
+                        <p>Compares the baseline D engine against the more faster variant so you can see whether extra search effort buys additional detection.</p>
                     </div>
                 </div>
             </article>
