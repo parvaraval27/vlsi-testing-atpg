@@ -1,43 +1,3 @@
-"""
-D Algorithm ATPG — Canonical Roth (1966) Implementation
-========================================================
-
-D-INTERSECTION TABLE (φ = None/conflict, X = identity element)
-───────────────────────────────────────────────────────────────
-         | 0       1       X       D       D_bar
-─────────┼────────────────────────────────────────
-  0      | 0       φ       0       φ       φ
-  1      | φ       1       1       φ       φ
-  X      | 0       1       X       D       D_bar
-  D      | φ       φ       D       D       φ
-  D_bar  | φ       φ       D_bar   φ       D_bar
-
-SINGULAR COVER TABLES (X = don't care in that position)
-────────────────────────────────────────────────────────
-AND  (2-in):  inputs=[0,X]→out=0  │  inputs=[X,0]→out=0  │  inputs=[1,1]→out=1
-OR   (2-in):  inputs=[1,X]→out=1  │  inputs=[X,1]→out=1  │  inputs=[0,0]→out=0
-NAND (2-in):  inputs=[0,X]→out=1  │  inputs=[X,0]→out=1  │  inputs=[1,1]→out=0
-NOR  (2-in):  inputs=[1,X]→out=0  │  inputs=[X,1]→out=0  │  inputs=[0,0]→out=1
-NOT  (1-in):  inputs=[0]→out=1    │  inputs=[1]→out=0
-BUF  (1-in):  inputs=[0]→out=0    │  inputs=[1]→out=1
-WIRE (1-in):  inputs=[0]→out=0    │  inputs=[1]→out=1
-XOR  (2-in):  inputs=[0,0]→out=0  │  inputs=[1,1]→out=0  │  inputs=[0,1]→out=1  │  inputs=[1,0]→out=1
-XNOR (2-in):  inputs=[0,0]→out=1  │  inputs=[1,1]→out=1  │  inputs=[0,1]→out=0  │  inputs=[1,0]→out=0
-
-For n-input AND/NAND/OR/NOR (n>2):
-  Controlling rows:  one per input position — that input = ctrl_val, all others = 'X'
-  Non-controlling row: all inputs = nc_val
-  AND:  ctrl=0  nc=1   ctrl_out=0  nc_out=1
-  OR:   ctrl=1  nc=0   ctrl_out=1  nc_out=0
-  NAND: ctrl=0  nc=1   ctrl_out=1  nc_out=0
-  NOR:  ctrl=1  nc=0   ctrl_out=0  nc_out=1
-
-For n-input XOR/XNOR (n>2):
-  Enumerate all 2^n binary combinations of '0'/'1' inputs.
-  XOR:  out='1' if odd number of 1s, else '0'
-  XNOR: out='0' if odd number of 1s, else '1'
-"""
-
 from time import perf_counter
 from collections import deque
 from itertools import product
@@ -49,9 +9,54 @@ from netlist_graph import (
 )
 
 # ═══════════════════════════════════════════════════════════════════
-# PART 1 — 5-VALUED LOGIC AND D-INTERSECTION TABLE
+# PART 1 — 5-VALUED LOGIC: TWO DISTINCT INTERSECTION OPERATIONS
 # ═══════════════════════════════════════════════════════════════════
 
+# ── Table 1: D-Algebra Intersection ─────────────────────────────────
+# Non-commutative.  Left = good-circuit value, Right = faulty-circuit value.
+# Produces D / D_bar symbols when the two circuits disagree.
+# Used ONLY during PDCF and PDC construction from SC rows.
+#
+#   good \ faulty |  '0'     '1'     'X'
+#   ──────────────┼───────────────────────
+#       '0'       |  '0'    'D_bar'  '0'
+#       '1'       |  'D'    '1'      '1'
+#       'X'       |  '0'    '1'      'X'
+#
+D_ALGEBRA = {
+    '0': {'0': '0',     '1': 'D_bar', 'X': '0'},
+    '1': {'0': 'D',     '1': '1',     'X': '1'},
+    'X': {'0': '0',     '1': '1',     'X': 'X'},
+}
+
+
+def _d_algebra_intersect(good_val, faulty_val):
+    """
+    D-Algebra intersection (TABLE 1).
+    Left operand  = good-circuit SC value.
+    Right operand = faulty-circuit SC value.
+    Returns the 5-valued symbol, or None if undefined for those inputs.
+    Non-commutative: _d_algebra_intersect('1','0') = 'D'
+                     _d_algebra_intersect('0','1') = 'D_bar'
+    """
+    row = D_ALGEBRA.get(good_val)
+    if row is None:
+        return None
+    return row.get(faulty_val)
+
+
+# ── Table 2: Test-Cube Intersection ─────────────────────────────────
+# Commutative.  φ (conflict) represented as None.
+# Used to merge successive test cubes during D-drive and justification.
+#
+#         |  '0'    '1'    'X'    'D'    'D_bar'
+#   ──────┼──────────────────────────────────────
+#   '0'   |  '0'     φ     '0'    φ       φ
+#   '1'   |   φ     '1'    '1'    φ       φ
+#   'X'   |  '0'    '1'    'X'   'D'    'D_bar'
+#   'D'   |   φ      φ     'D'   'D'      φ
+#  'D_bar'|   φ      φ   'D_bar'  φ    'D_bar'
+#
 D_INTERSECTION = {
     '0':     {'0': '0',     '1': None,    'X': '0',     'D': None,    'D_bar': None    },
     '1':     {'0': None,    '1': '1',     'X': '1',     'D': None,    'D_bar': None    },
@@ -62,7 +67,11 @@ D_INTERSECTION = {
 
 
 def _d_intersect(v1, v2):
-    """Returns D_INTERSECTION[v1][v2], or None on conflict (φ)."""
+    """
+    Test-Cube intersection (TABLE 2).
+    Commutative. Returns None on conflict (φ).
+    Used to merge test cubes: TC(n) ∩ new_cube → TC(n+1).
+    """
     return D_INTERSECTION[v1][v2]
 
 
@@ -333,38 +342,67 @@ class DAlgorithmEngine:
 
     def _compute_pdcf_candidates(self, fault):
         """
-        Return list of PDCF cubes for the given fault.
-        Each cube is a dict: {node_object: '0'|'1'|'X'|'D'|'D_bar'}
-        mapping the fault gate's fanin nodes and the fault node itself.
-        For PI faults, return a single cube {fault.node: D_symbol}.
+        Derive PDCF cubes using the D-Algebra Intersection (TABLE 1).
+
+        Method (Roth 1966):
+          1. SC of good circuit  -> keep rows where output = good_output (1-stuck_at)
+          2. SC of faulty circuit -> one row: inputs all X, output = stuck_at value
+          3. For each good-SC row, D-Algebra intersect position by position:
+               D_ALGEBRA[good_val][faulty_val]  ->  5-valued symbol
+             NON-COMMUTATIVE: good on left, faulty on right.
+               1 intersect 0 = D      (good=1, faulty=0)
+               0 intersect 1 = D_bar  (good=0, faulty=1)
+               X intersect v = v,  v intersect X = v
+          The D/D_bar at the output emerges from the intersection itself,
+          not from a hard-coded assignment.
         """
-        d_symbol = 'D' if fault.stuck_at == 0 else 'D_bar'
+        stuck_val   = str(fault.stuck_at)
+        good_output = str(1 - fault.stuck_at)
 
-        # Primary-input fault: single trivial PDCF
+        # Faulty-circuit SC: one row, inputs all X, output = stuck value
+        faulty_inputs = ['X'] * max(1, len(fault.node.fanins))
+
+        # Primary-input fault: no gate SC, return trivial cube directly
         if fault.node.role == 'PI' or not fault.node.fanins:
-            return [{fault.node: d_symbol}]
+            out_sym = _d_algebra_intersect(good_output, stuck_val)
+            return [{fault.node: out_sym}]
 
-        # Non-PI: derive PDCF from Singular Cover of the fault gate
         gate_type   = fault.node.type
         fanin_count = len(fault.node.fanins)
         sc_rows     = _get_sc(gate_type, fanin_count)
 
-        # Good-circuit output = 1 - stuck_at
-        good_output = str(1 - fault.stuck_at)
-        matching    = [r for r in sc_rows if r['output'] == good_output]
+        # Good-circuit SC rows producing the non-stuck output
+        good_rows = [r for r in sc_rows if r['output'] == good_output]
 
         pdcf_list = []
-        for row in matching:
-            cube = {}
+        for good_row in good_rows:
+            cube     = {}
+            conflict = False
+
+            # D-Algebra intersect at each input position (good intersect faulty)
             for i, fi in enumerate(fault.node.fanins):
-                v = row['inputs'][i] if i < len(row['inputs']) else 'X'
-                cube[fi] = v  # include X positions to form a complete Roth cube
-            cube[fault.node] = d_symbol
+                g_val = good_row['inputs'][i] if i < len(good_row['inputs']) else 'X'
+                f_val = faulty_inputs[i]        if i < len(faulty_inputs)       else 'X'
+                sym   = _d_algebra_intersect(g_val, f_val)
+                if sym is None:
+                    conflict = True
+                    break
+                cube[fi] = sym
+
+            if conflict:
+                continue
+
+            # D-Algebra intersect at output position -> produces D or D_bar
+            out_sym = _d_algebra_intersect(good_output, stuck_val)
+            if out_sym is None:
+                continue
+            cube[fault.node] = out_sym
             pdcf_list.append(cube)
 
-        # Fallback: if SC produced nothing, use simple D injection
+        # Fallback: SC produced nothing, inject symbol directly
         if not pdcf_list:
-            pdcf_list = [{fault.node: d_symbol}]
+            out_sym = _d_algebra_intersect(good_output, stuck_val)
+            pdcf_list = [{fault.node: out_sym}]
 
         return pdcf_list
 
@@ -374,12 +412,18 @@ class DAlgorithmEngine:
 
     def _compute_pdc(self, gate, d_input_node, d_val):
         """
-        Compute the PDC cube for propagating d_val ('D' or 'D_bar')
-        through gate, entering via d_input_node.
+        Compute the PDC cube using D-Algebra Intersection (TABLE 1).
+
+        Conceptually this intersects two SC rows of the same gate:
+          - Row A (good circuit):   sensitized input = good_val,  others = nc_val
+          - Row B (faulty circuit): sensitized input = faulty_val, others = nc_val
+        D-Algebra intersect A ∩ B position by position:
+          sensitized input  -> D or D_bar  (good != faulty)
+          non-sensitized    -> nc_val ∩ nc_val = nc_val  (unchanged)
+          output            -> D or D_bar  (if gate propagates the discrepancy)
+
         Returns a cube dict {node: value} for all fanin nodes + gate output,
-        or None if propagation is impossible through this gate.
-        Non-sensitized fanin inputs are set to their non-controlling value.
-        For XOR/XNOR: the other input must be '0' for transparent propagation.
+        or None if propagation is impossible (output does not become D/D_bar).
         """
         gate_type = gate.type
         good   = 1 if d_val == 'D' else 0

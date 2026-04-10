@@ -19,3 +19,5 @@ env/
 ENV/
 .env/
 .virtualenv/
+
+.early.coverage
