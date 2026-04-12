@@ -28,7 +28,6 @@ def get_or_create_node(circuit, name, gate_type="WIRE"):
             circuit.nodes[name].role = "PI"
         elif gate_type == "PO":
             circuit.nodes[name].role = "PO"
-            # Keep declared PO role but let logic type be inferred from driver gate.
             circuit.nodes[name].type = "WIRE"
     else:
         node = circuit.nodes[name]
@@ -90,8 +89,6 @@ def parse_netlist(filename):
                 continue
 
             else:
-                # Project netlist style: <gate> <instance> (output, input1, input2, ...);
-                # Output is always the first pin. Remaining pins are inputs.
                 stmt = line.rstrip(";")
                 if "(" not in stmt or ")" not in stmt:
                     continue
@@ -244,18 +241,6 @@ def eval_gate(node):
 
 
 def simulate_event_driven(circuit, changed_inputs=None):
-    """
-    Event-Driven True-Value Simulation Algorithm.
-    
-    Zero-delay event-driven simulation:
-    1. Read the current input condition.
-    2. Put the fanout gates of active PIs and constants into the queue.
-    3. While the queue is not empty:
-       - Dequeue the next gate g.
-       - Evaluate g from its current fanin values.
-       - If g's output changes, enqueue all fanout gates of g.
-    4. When the queue becomes empty, the circuit has settled for this vector.
-    """
     from collections import deque
     
     activity_queue = deque()
@@ -351,7 +336,6 @@ def run_folder_demo(netlist_folder="netlists"):
     for name, circuit in circuits.items():
         levelize(circuit)
         assign_default_inputs(circuit)
-        #simulate(circuit)
         simulate_event_driven(circuit)
         faults = generate_faults(circuit)
 

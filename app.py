@@ -5,7 +5,6 @@ from html import escape
 import os
 import sys
 
-# Import ATPG engines
 sys.path.insert(0, os.path.dirname(__file__))
 from d import DAlgorithmEngine
 from d2 import DAlgorithmEngine as DQuickAlgorithmEngine
@@ -44,7 +43,6 @@ def info_page():
 
 @app.route('/api/netlists', methods=['GET'])
 def list_netlists():
-    """List available netlists."""
     try:
         if not NETLISTS_FOLDER.exists():
             return jsonify({'netlists': []})
@@ -57,7 +55,6 @@ def list_netlists():
 
 @app.route('/api/images/<path:filename>', methods=['GET'])
 def serve_image(filename):
-    """Serve netlist-related images from the images folder."""
     safe_name = Path(filename).name
     image_path = IMAGES_FOLDER / safe_name
     if not image_path.exists() or not image_path.is_file():
@@ -66,7 +63,6 @@ def serve_image(filename):
 
 @app.route('/api/run', methods=['POST'])
 def run_atpg():
-    """Run ATPG on selected netlists and algorithms."""
     try:
         payload = request.json or {}
         netlist_names = payload.get('netlists', [])
@@ -136,7 +132,6 @@ def _image_url_for_netlist(netlist_name):
 
 
 def _basic_image_options_for_netlist(netlist_name):
-    """Collect image choices for Basic Flow: generated graph first, then external files."""
     options = []
     seen_urls = set()
 
@@ -171,7 +166,6 @@ def _basic_image_options_for_netlist(netlist_name):
 
 
 def _generate_basic_flow_netlist_svg(netlist_name):
-    """Generate an SVG netlist graph for Basic Flow when no image asset exists."""
     try:
         stem = Path(netlist_name).stem
         netlist_path = NETLISTS_FOLDER / netlist_name
@@ -180,12 +174,9 @@ def _generate_basic_flow_netlist_svg(netlist_name):
 
         svg_path = IMAGES_FOLDER / f"{stem}.svg"
 
-        # Reuse an existing generated SVG if already present.
         if svg_path.exists() and svg_path.is_file():
             return f"/api/images/{svg_path.name}"
 
-        # Vercel serverless filesystem is read-only for persistent writes.
-        # If no pre-generated SVG exists, skip runtime file generation.
         if os.getenv('VERCEL') == '1':
             return None
 
@@ -293,7 +284,6 @@ def _generate_basic_flow_netlist_svg(netlist_name):
         return None
 
 def format_result(result_data, algo, filename):
-    """Format ATPG result data for frontend display."""
     final_vectors = _build_final_vector_summary(result_data)
 
     stats = {
@@ -309,7 +299,6 @@ def format_result(result_data, algo, filename):
         'Average per fault (us)': f"{result_data.get('avg_time_per_fault_us', 0):.3f}",
     }
 
-    # Keep per-fault lines in the same style as CLI output.
     faults = [_format_fault_line(entry) for entry in result_data.get('results', [])]
     detected_faults = _detected_fault_lines(result_data, concrete_only=True)
     undetected_faults = _undetected_fault_lines(result_data)
@@ -326,7 +315,6 @@ def format_result(result_data, algo, filename):
 
 
 def format_basic_result(result_data, filename):
-    """Format old main.py option 1 (basic flow) data for frontend display."""
     stats = {
         'Status': result_data.get('status', 'ok'),
         'Nodes': result_data.get('node_count', 0),

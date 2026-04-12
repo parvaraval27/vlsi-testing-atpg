@@ -16,7 +16,6 @@ bp = Blueprint('dse1', __name__)
 
 @bp.route('/api/dse', methods=['POST'])
 def run_dse():
-    """Run DSE #1: compare D and heuristic-enabled PODEM."""
     try:
         payload = request.json or {}
         netlist_names = payload.get('netlists', [])
@@ -73,7 +72,6 @@ def run_dse():
 
 @bp.route('/api/dse-iterative', methods=['POST'])
 def run_dse_iterative():
-    """Run DSE #1 iteratively: D vs PODEM with multiple iterations."""
     try:
         payload = request.json or {}
         netlist_names = payload.get('netlists', [])

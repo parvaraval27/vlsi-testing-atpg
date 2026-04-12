@@ -23,7 +23,6 @@ def _set_changed_inputs(circuit, previous_vector, next_vector):
 
 
 def _build_sparse_vector_sequence(circuit, count, toggle_density, seed):
-    """Build deterministic sparse-activity vectors for fair multivector benchmarking."""
     assign_default_inputs(circuit)
     current = {pi.name: pi.value for pi in circuit.PIs}
     vectors = [dict(current)]
@@ -51,7 +50,6 @@ def _build_sparse_vector_sequence(circuit, count, toggle_density, seed):
 
 @bp.route('/api/dse-sim-kernels', methods=['POST'])
 def run_dse_sim_kernels():
-    """Run DSE #4: compare simulate() and simulate_event_driven() for Basic flow."""
     try:
         payload = request.json or {}
         netlist_names = payload.get('netlists', [])
@@ -148,7 +146,6 @@ def run_dse_sim_kernels():
 
 @bp.route('/api/dse-sim-kernels-iterative', methods=['POST'])
 def run_dse_sim_kernels_iterative():
-    """Run DSE #4 in sparse multivector mode: full-pass SIMULATE vs incremental EVENT_DRIVEN."""
     try:
         payload = request.json or {}
         netlist_names = payload.get('netlists', [])

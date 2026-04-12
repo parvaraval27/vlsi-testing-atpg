@@ -277,7 +277,6 @@ class PODEMEngine:
         req = self._non_controlling_value(gate.type)
         if req == 'X':
             if self.use_heuristics:
-                # XOR/XNOR has no strict non-controlling value; choose easier assignment.
                 candidate = min(
                     x_fanins,
                     key=lambda n: min(self._cc(n, '0'), self._cc(n, '1')),
@@ -372,7 +371,6 @@ class PODEMEngine:
         return any(po.value in ('D', 'D_bar') for po in self.circuit.POs)
 
     def _state_signature(self):
-        # Include all node values to avoid revisiting identical logic states.
         return tuple(
             (node.name, node.value)
             for node in sorted(self.circuit.nodes.values(), key=lambda n: n.name)
@@ -401,7 +399,6 @@ class PODEMEngine:
 
         old_pi = pi.value
 
-        # Try preferred assignment first, but skip if it cannot change state.
         if old_pi == 'X' or old_pi != pi_v:
             self._imply(pi, pi_v)
             if self._podem_recur(fault, v_fault):

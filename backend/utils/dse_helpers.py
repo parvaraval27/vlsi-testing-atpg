@@ -8,7 +8,6 @@ from netlist_graph import simulate, simulate_event_driven
 
 
 def run_engine_with_memory(engine):
-    """Run an ATPG engine and capture wall time plus peak traced memory."""
     tracemalloc.start()
     t0 = perf_counter()
     result = engine.run()
@@ -304,7 +303,6 @@ def run_simulation_kernel_with_memory(circuit, kernel, changed_inputs=None):
 
 
 def calculate_stats(values):
-    """Calculate min, max, avg, std dev from a list of numbers."""
     if not values:
         return {'min': 0, 'max': 0, 'avg': 0, 'std': 0}
 
@@ -322,7 +320,6 @@ def calculate_stats(values):
 
 
 def aggregate_algo_metrics_iterative(label, results_list):
-    """Aggregate metrics from multiple runs of an algorithm."""
     if not results_list:
         return {
             'key': label,

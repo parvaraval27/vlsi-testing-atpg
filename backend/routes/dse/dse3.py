@@ -16,7 +16,6 @@ bp = Blueprint('dse3', __name__)
 
 @bp.route('/api/dse-d-variants', methods=['POST'])
 def run_dse_d_variants():
-    """Run DSE #3: compare D and D_QUICK."""
     try:
         payload = request.json or {}
         netlist_names = payload.get('netlists', [])
@@ -70,7 +69,6 @@ def run_dse_d_variants():
 
 @bp.route('/api/dse-d-variants-iterative', methods=['POST'])
 def run_dse_d_variants_iterative():
-    """Run DSE #3 iteratively: D vs D_QUICK with multiple iterations."""
     try:
         payload = request.json or {}
         netlist_names = payload.get('netlists', [])

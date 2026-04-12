@@ -15,7 +15,6 @@ bp = Blueprint('dse5', __name__)
 
 @bp.route('/api/dse-fill-variants', methods=['POST'])
 def run_dse_fill_variants():
-    """Run DSE #5: compare fill policies on detected vectors."""
     try:
         payload = request.json or {}
         netlist_names = payload.get('netlists', [])
@@ -67,7 +66,6 @@ def run_dse_fill_variants():
 
 @bp.route('/api/dse-fill-variants-iterative', methods=['POST'])
 def run_dse_fill_variants_iterative():
-    """Run DSE #5 iteratively: compare fill policies across multiple iterations."""
     try:
         payload = request.json or {}
         netlist_names = payload.get('netlists', [])

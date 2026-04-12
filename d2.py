@@ -105,7 +105,7 @@ class DAlgorithmEngine:
     def _non_controlling_value(self, gate_type):
         if gate_type in ('AND', 'NAND'): return '1'
         if gate_type in ('OR', 'NOR'): return '0'
-        return 'X'  # XOR/XNOR lack absolute non-controlling definitions
+        return 'X'
 
     def _get_d_frontier(self):
         frontier = []
@@ -116,21 +116,19 @@ class DAlgorithmEngine:
                 in_vals = [inp.value for inp in node.fanins]
                 if any(v in ('D', 'D_bar') for v in in_vals):
                     frontier.append(node)
-        # Sort by level (highest first) to accelerate fault delivery to POs
         return sorted(frontier, key=lambda n: n.level, reverse=True)
 
     def _is_justified(self, node):
         if node.value in ('X', 'D', 'D_bar'):
-            return True # Fault injection naturally forces D states
+            return True
             
         in_vals = [inp.value for inp in node.fanins]
         if 'X' not in in_vals:
-            return True # Fully specified inputs are self-justifying
+            return True
 
-        # Simulate worst-case scenario: map all unknowns to non-controlling values
         simulated_vals = [v if v != 'X' else self._non_controlling_value(node.type) for v in in_vals]
         if 'X' in simulated_vals:
-            return False # XOR/XNOR gates with unknowns cannot be guaranteed
+            return False
             
         sim_good = []
         for v in simulated_vals:
@@ -150,7 +148,6 @@ class DAlgorithmEngine:
             if node.value in ('0', '1'):
                 if not self._is_justified(node):
                     frontier.append(node)
-        # Sort by level (lowest first) to force justification towards Primary Inputs
         return sorted(frontier, key=lambda n: n.level)
 
     def _imply(self):
@@ -158,7 +155,6 @@ class DAlgorithmEngine:
         while changed:
             changed = False
             for node in sorted(self.circuit.nodes.values(), key=lambda n: n.level):
-                # Phase 1: Forward Implication
                 if node.role not in ('PI', 'CONST'):
                     new_val = self._eval_gate_5val(node)
                     if new_val != 'X':
@@ -166,9 +162,8 @@ class DAlgorithmEngine:
                             node.value = new_val
                             changed = True
                         elif node.value != new_val:
-                            return False # Structural D-intersection conflict
+                            return False
 
-                # Phase 2: Deterministic Backward Implication
                 if node.value != 'X' and node.type not in ('PI', 'WIRE', 'CONST'):
                     target = node.value
                     if node.type == 'NOT':
