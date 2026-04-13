@@ -91,7 +91,7 @@
             const n = Number(rawValue);
             if (!Number.isFinite(n)) return null;
             const rounded = Math.round(n);
-            if (rounded < 1 || rounded > 10) return null;
+            if (rounded < 1 || rounded > 1000) return null;
             return rounded;
         }
 
@@ -111,7 +111,7 @@
             }
 
             if (iterations === null) {
-                status.textContent = 'Iterations must be an integer between 1 and 10.';
+                status.textContent = 'Iterations must be an integer between 1 and 1000.';
                 status.classList.add('error');
                 return null;
             }
@@ -286,7 +286,7 @@
                 status.textContent = `DSE #1 complete: ${(data.comparisons || []).length} netlist comparison(s).`;
                 status.classList.remove('running', 'error');
                 status.classList.add('success');
-                renderDseResults(data.comparisons || [], selectedMetrics, dseResultsPrimary, 'DSE #1', 'd_variants', dseMode.iterative);
+                renderDseResults(data.comparisons || [], selectedMetrics, dseResultsPrimary, 'DSE #1', 'd_vs_podem', dseMode.iterative);
             } catch (err) {
                 status.textContent = 'DSE failed: ' + err.message;
                 status.classList.add('error');
@@ -436,7 +436,8 @@
                 return;
             }
 
-            const dseMode = { iterative: true, iterations: 3 };
+            const dseMode = getDseExecutionSettings();
+            if (!dseMode) return;
 
             const selectedMetrics = getSelectedMetrics();
             const dse4Metrics = selectedMetrics.filter(m => m === 'time' || m === 'memory');
@@ -447,18 +448,20 @@
             }
 
             runDseSimKernelsBtn.disabled = true;
-            status.textContent = `Running DSE #4 (${dseMode.iterations} iterations) on ${selectedNetlists.length} netlist(s)...`;
+            status.textContent = dseMode.iterative
+                ? `Running DSE #4 (${dseMode.iterations} iterations) on ${selectedNetlists.length} netlist(s)...`
+                : `Running DSE #4 on ${selectedNetlists.length} netlist(s)...`;
             status.classList.add('running');
             status.classList.remove('error');
             focusOutputPanel('dse4');
             dseResultsSimKernels.innerHTML = '';
 
             try {
-                const endpoint = '/api/dse-sim-kernels-iterative';
+                const endpoint = dseMode.iterative ? '/api/dse-sim-kernels-iterative' : '/api/dse-sim-kernels';
                 const requestBody = {
                     netlists: selectedNetlists,
                     metrics: dse4Metrics,
-                    iterations: dseMode.iterations,
+                    ...(dseMode.iterative ? { iterations: dseMode.iterations } : {}),
                 };
 
                 const resp = await fetch(endpoint, {
@@ -700,7 +703,7 @@
                             const stats = a.metrics_stats && a.metrics_stats[metric];
                             if (!stats) return '<td>N/A</td>';
                             const avg = stats.avg || 0;
-                            const decimals = (metric === 'coverage') ? 2 : (metric === 'test_vectors' || metric === 'backtracks') ? 0 : 1;
+                            const decimals = (metric === 'coverage') ? 2 : (metric === 'test_vectors' || metric === 'backtracks') ? 0 : (metric === 'time') ? 3 : 1;
                             return `<td style="font-size: 13px; font-weight: 600;">${avg.toFixed(decimals)}</td>`;
                         }).join('');
                         return `<tr><td>${metricLabels[metric] || metric}</td>${statCells}</tr>`;
@@ -708,7 +711,9 @@
 
                     const overlap = cmp.fault_overlap || {};
                     let overlapText = `Both detected (avg): ${overlap.both_detected_avg || 0} (min: ${overlap.both_detected_min || 0}, max: ${overlap.both_detected_max || 0})`;
-                    if (overlapMode === 'd_variants') {
+                    if (overlapMode === 'd_vs_podem') {
+                        overlapText += `, D-only (avg): ${overlap.d_only_avg || 0}, PODEM-only (avg): ${overlap.podem_only_avg || 0}`;
+                    } else if (overlapMode === 'd_variants') {
                         overlapText += `, D-only (avg): ${overlap.d_only_avg || 0}, D_QUICK-only (avg): ${overlap.d_quick_only_avg || 0}`;
                     } else if (overlapMode === 'podem_variants') {
                         overlapText += `, PODEM-only (avg): ${overlap.podem_only_avg || 0}, PODEM_NO_HEUR-only (avg): ${overlap.podem_no_heur_only_avg || 0}`;
@@ -770,7 +775,9 @@
 
                     const overlap = cmp.fault_overlap || {};
                     let overlapText = `Both detected: ${overlap.both_detected || 0}`;
-                    if (overlapMode === 'd_variants') {
+                    if (overlapMode === 'd_vs_podem') {
+                        overlapText = `${overlapText}, D-only: ${overlap.d_only || 0}, PODEM-only: ${overlap.podem_only || 0}`;
+                    } else if (overlapMode === 'd_variants') {
                         overlapText = `${overlapText}, D-only: ${overlap.d_only || 0}, D_QUICK-only: ${overlap.d_quick_only || 0}`;
                     } else if (overlapMode === 'podem_variants') {
                         overlapText = `${overlapText}, PODEM-only: ${overlap.podem_only || 0}, PODEM_NO_HEUR-only: ${overlap.podem_no_heur_only || 0}`;
@@ -922,7 +929,7 @@
                 ctx.fillRect(x, y, barW, h);
 
                 ctx.fillStyle = '#10243f';
-                const decimals = metric === 'coverage' ? 2 : (metric === 'test_vectors' || metric === 'backtracks') ? 0 : 1;
+                const decimals = metric === 'coverage' ? 2 : (metric === 'test_vectors' || metric === 'backtracks') ? 0 : (metric === 'time') ? 3 : 1;
                 ctx.fillText(v.toFixed(decimals), x, y - 5);
                 ctx.fillText(algos[i].label, x, height - 8);
             });

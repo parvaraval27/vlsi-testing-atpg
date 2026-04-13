@@ -120,7 +120,7 @@ def run_dse_iterative():
                     'both_detected_min': min(both_detected_counts) if both_detected_counts else 0,
                     'both_detected_max': max(both_detected_counts) if both_detected_counts else 0,
                     'd_only_avg': sum(d_only_counts) / len(d_only_counts) if d_only_counts else 0,
-                    'pode_only_avg': sum(p_only_counts) / len(p_only_counts) if p_only_counts else 0,
+                'podem_only_avg': sum(p_only_counts) / len(p_only_counts) if p_only_counts else 0,
                 },
             })
 
