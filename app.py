@@ -2,6 +2,7 @@ from flask import Flask, render_template, jsonify, request, send_from_directory
 from pathlib import Path
 from collections import defaultdict
 from html import escape
+import base64
 import os
 import sys
 
@@ -152,7 +153,7 @@ def _basic_image_options_for_netlist(netlist_name):
         if not candidate.exists() or not candidate.is_file():
             continue
 
-        url = f"/api/images/{candidate.name}"
+        url = _image_data_uri_for_file(candidate)
         if url in seen_urls:
             continue
 
@@ -165,6 +166,25 @@ def _basic_image_options_for_netlist(netlist_name):
     return options
 
 
+def _image_data_uri_for_file(image_path):
+    suffix = image_path.suffix.lower()
+    mime_type = {
+        '.svg': 'image/svg+xml',
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp',
+    }.get(suffix)
+
+    if mime_type is None:
+        return f"/api/images/{image_path.name}"
+
+    raw_bytes = image_path.read_bytes()
+    encoded = base64.b64encode(raw_bytes).decode('ascii')
+    return f"data:{mime_type};base64,{encoded}"
+
+
 def _generate_basic_flow_netlist_svg(netlist_name):
     try:
         stem = Path(netlist_name).stem
@@ -175,7 +195,7 @@ def _generate_basic_flow_netlist_svg(netlist_name):
         svg_path = IMAGES_FOLDER / f"{stem}.svg"
 
         if svg_path.exists() and svg_path.is_file():
-            return f"/api/images/{svg_path.name}"
+            return _image_data_uri_for_file(svg_path)
 
         if os.getenv('VERCEL') == '1':
             return None
@@ -279,7 +299,7 @@ def _generate_basic_flow_netlist_svg(netlist_name):
         )
 
         svg_path.write_text(svg, encoding='utf-8')
-        return f"/api/images/{svg_path.name}"
+        return _image_data_uri_for_file(svg_path)
     except Exception:
         return None
 
