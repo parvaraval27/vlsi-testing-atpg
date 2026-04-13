@@ -623,8 +623,10 @@
                     ? `${renderVectorSummary(res.final_vector_summary, 'Final Test Vector Set')}${renderDetectedFaultSummary(res.detected_faults || [], 'Detected Per-Fault List')}${renderFaultSummary(res.undetected_faults || [], 'Undetected Faults', 'No undetected faults.')}`
                     : '';
                 const detailTitle = res.algorithm === 'BASIC' ? 'Simulation details' : 'Per-fault details';
-                const imageOptions = Array.isArray(res.basic_image_options) ? res.basic_image_options : [];
-                const selectedImageUrl = (res.basic_image_url || (imageOptions.length ? imageOptions[0].url : null));
+                const imageOptions = Array.isArray(res.image_options)
+                    ? res.image_options
+                    : (Array.isArray(res.basic_image_options) ? res.basic_image_options : []);
+                const selectedImageUrl = (res.image_url || res.basic_image_url || (imageOptions.length ? imageOptions[0].url : null));
                 const imageSelectId = `basic-image-select-${idx}`;
                 const imageViewId = `basic-image-view-${idx}`;
                 const dropdownHtml = imageOptions.length > 1
@@ -637,7 +639,7 @@
                         </select>
                     `
                     : '';
-                const basicImageHtml = (res.algorithm === 'BASIC' && selectedImageUrl)
+                const basicImageHtml = selectedImageUrl
                     ? `
                         <div class="basic-image-panel">
                             <h4 class="basic-image-title">Netlist Image</h4>

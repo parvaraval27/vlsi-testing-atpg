@@ -285,6 +285,7 @@ def _generate_basic_flow_netlist_svg(netlist_name):
 
 def format_result(result_data, algo, filename):
     final_vectors = _build_final_vector_summary(result_data)
+    image_options = _basic_image_options_for_netlist(filename)
 
     stats = {
         'Status': result_data.get('status', 'ok'),
@@ -311,10 +312,13 @@ def format_result(result_data, algo, filename):
         'final_vector_summary': final_vectors,
         'detected_faults': detected_faults,
         'undetected_faults': undetected_faults,
+        'image_url': image_options[0]['url'] if image_options else None,
+        'image_options': image_options,
     }
 
 
 def format_basic_result(result_data, filename):
+    image_options = _basic_image_options_for_netlist(filename)
     stats = {
         'Status': result_data.get('status', 'ok'),
         'Nodes': result_data.get('node_count', 0),
@@ -347,6 +351,8 @@ def format_basic_result(result_data, filename):
         'stats': stats,
         'faults': faults,
         'hide_vector_sections': True,
+        'image_url': image_options[0]['url'] if image_options else None,
+        'image_options': image_options,
         'basic_image_url': image_options[0]['url'] if image_options else None,
         'basic_image_options': image_options,
     }
