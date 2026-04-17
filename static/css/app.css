@@ -626,6 +626,10 @@
             line-height: 1.6;
         }
 
+        .route-map-card {
+            grid-column: 1 / -1;
+        }
+
         .explain-note {
             padding: 12px 14px;
             border-radius: 12px;

@@ -45,6 +45,27 @@
 
             <article class="explainer-card">
                 <header>
+                    <h2>Add a New Netlist</h2>
+                    <span class="badge badge-run">Netlist Format</span>
+                </header>
+                <div class="body">
+                    <div class="explain-note">
+                        Add your new circuit file to the <strong>netlists/</strong> folder as a <strong>.txt</strong> file. The app scans that folder and shows every valid netlist in the console.
+                    </div>
+                    <div class="flow-steps">
+                        <div class="flow-step"><strong>1.</strong> Put the file in <strong>netlists/</strong> at the project root.</div>
+                        <div class="flow-step"><strong>2.</strong> Use the bench-style format: <code>INPUT(x)</code>, <code>OUTPUT(x)</code>, and gate lines like <code>y = NAND(a, b)</code>.</div>
+                        <div class="flow-step"><strong>3.</strong> Comment lines can start with <code>#</code> or <code>//</code>; blank lines are ignored.</div>
+                        <div class="flow-step"><strong>4.</strong> Once added, the netlist can be selected in the UI and used by Basic Flow, D, PODEM and DSE comparisons.</div>
+                    </div>
+                    <p style="margin: 10px 0 0 0; color: #365274; font-size: 12px; line-height: 1.5;">
+                        Example: <code>INPUT(1)</code>, <code>OUTPUT(22)</code>, <code>10 = NAND(1, 3)</code>. The parser builds the circuit graph from these lines, then levelization and simulation happen automatically.
+                    </p>
+                </div>
+            </article>
+
+            <article class="explainer-card route-map-card">
+                <header>
                     <h2>Route Map</h2>
                     <span class="badge badge-run">API Overview</span>
                 </header>

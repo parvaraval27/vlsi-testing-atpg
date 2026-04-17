@@ -1,0 +1,25 @@
+// full_adder
+// Ninputs 3
+// Noutputs 2
+// NtotalGates 9
+// NAND2 9
+
+module full_adder (A, B, Cin, Sum, Cout);
+
+input A, B, Cin;
+
+output Sum, Cout;
+
+wire N1, N2, N3, N4, N5, N6, N7;
+
+nand NAND2_1 (N1, A, B);
+nand NAND2_2 (N2, A, N1);
+nand NAND2_3 (N3, B, N1);
+nand NAND2_4 (N4, N2, N3); // N4 is (A ^ B)
+nand NAND2_5 (N5, N4, Cin);
+nand NAND2_6 (N6, N4, N5);
+nand NAND2_7 (N7, Cin, N5);
+nand NAND2_8 (Sum, N6, N7); // Final Sum
+nand NAND2_9 (Cout, N1, N5); // Final Cout
+
+endmodule
